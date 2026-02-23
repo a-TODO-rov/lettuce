@@ -60,7 +60,7 @@ import io.lettuce.core.protocol.CompleteableCommand;
 import io.lettuce.core.protocol.ConnectionIntent;
 import io.lettuce.core.protocol.ConnectionWatchdog;
 import io.lettuce.core.protocol.RedisCommand;
-import reactor.core.publisher.Mono;
+
 
 /**
  * A thread-safe connection to a Redis Cluster. Multiple threads may share one {@link StatefulRedisClusterConnectionImpl}

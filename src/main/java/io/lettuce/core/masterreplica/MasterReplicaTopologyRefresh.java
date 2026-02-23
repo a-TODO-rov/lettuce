@@ -5,7 +5,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ScheduledExecutorService;
 
-import reactor.core.publisher.Mono;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisConnectionException;
 import io.lettuce.core.RedisURI;
@@ -53,24 +52,24 @@ class MasterReplicaTopologyRefresh {
      * @param seed collection of {@link RedisURI}s
      * @return mapping between {@link RedisURI} and {@link Partitions}
      */
-    public Mono<List<RedisNodeDescription>> getNodes(RedisURI seed) {
+    public CompletableFuture<List<RedisNodeDescription>> getNodes(RedisURI seed) {
 
         CompletableFuture<List<RedisNodeDescription>> future = topologyProvider.getNodesAsync();
 
-        Mono<List<RedisNodeDescription>> initialNodes = Mono.fromFuture(future).doOnNext(nodes -> {
+        return future.thenApply(nodes -> {
             applyAuthenticationCredentials(nodes, seed);
-        });
-
-        return initialNodes.map(this::getConnections)
-                .flatMap(asyncConnections -> asyncConnections.asMono(seed.getTimeout(), eventExecutors))
-                .flatMap(connections -> {
+            return nodes;
+        }).thenApply(this::getConnections)
+                .thenCompose(asyncConnections -> asyncConnections.asCompletableFuture(seed.getTimeout(), eventExecutors))
+                .thenCompose(connections -> {
 
                     Requests requests = connections.requestPing();
 
                     CompletionStage<List<RedisNodeDescription>> nodes = requests.getOrTimeout(seed.getTimeout(),
                             eventExecutors);
 
-                    return Mono.fromCompletionStage(nodes).flatMap(it -> ResumeAfter.close(connections).thenEmit(it));
+                    return nodes.toCompletableFuture()
+                            .thenCompose(it -> ResumeAfter.close(connections).thenEmit(it));
                 });
     }
 

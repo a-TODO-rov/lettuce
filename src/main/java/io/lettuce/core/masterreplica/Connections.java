@@ -13,14 +13,13 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import reactor.core.publisher.Mono;
-import reactor.util.function.Tuple2;
 import io.lettuce.core.RedisConnectionException;
 import io.lettuce.core.RedisURI;
 import io.lettuce.core.api.AsyncCloseable;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.codec.StringCodec;
 import io.lettuce.core.internal.Futures;
+import io.lettuce.core.internal.Pair;
 import io.lettuce.core.models.role.RedisNodeDescription;
 import io.lettuce.core.output.StatusOutput;
 import io.lettuce.core.protocol.Command;
@@ -39,7 +38,7 @@ import io.lettuce.core.protocol.CommandType;
  *
  * @author Mark Paluch
  */
-class Connections extends CompletableEventLatchSupport<Tuple2<RedisURI, StatefulRedisConnection<String, String>>, Connections>
+class Connections extends CompletableEventLatchSupport<Pair<RedisURI, StatefulRedisConnection<String, String>>, Connections>
         implements AsyncCloseable {
 
     private final Lock lock = new ReentrantLock();
@@ -59,16 +58,16 @@ class Connections extends CompletableEventLatchSupport<Tuple2<RedisURI, Stateful
     }
 
     @Override
-    protected void onAccept(Tuple2<RedisURI, StatefulRedisConnection<String, String>> value) {
+    protected void onAccept(Pair<RedisURI, StatefulRedisConnection<String, String>> value) {
 
         if (this.closed) {
-            value.getT2().closeAsync();
+            value.getSecond().closeAsync();
             return;
         }
 
         try {
             lock.lock();
-            this.connections.put(value.getT1(), value.getT2());
+            this.connections.put(value.getFirst(), value.getSecond());
         } finally {
             lock.unlock();
         }
@@ -80,8 +79,8 @@ class Connections extends CompletableEventLatchSupport<Tuple2<RedisURI, Stateful
     }
 
     @Override
-    protected void onDrop(Tuple2<RedisURI, StatefulRedisConnection<String, String>> value) {
-        value.getT2().closeAsync();
+    protected void onDrop(Pair<RedisURI, StatefulRedisConnection<String, String>> value) {
+        value.getSecond().closeAsync();
     }
 
     @Override

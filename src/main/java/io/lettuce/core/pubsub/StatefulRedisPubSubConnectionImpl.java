@@ -111,7 +111,7 @@ public class StatefulRedisPubSubConnectionImpl<K, V> extends StatefulRedisConnec
 
     @Override
     public RedisPubSubReactiveCommands<K, V> reactive() {
-        return (RedisPubSubReactiveCommands<K, V>) reactive;
+        return (RedisPubSubReactiveCommands<K, V>) super.reactive();
     }
 
     @Override

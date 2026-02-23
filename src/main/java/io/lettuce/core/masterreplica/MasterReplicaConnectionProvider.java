@@ -17,8 +17,6 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 import io.lettuce.core.ConnectionFuture;
 import io.lettuce.core.OrderingReadFromAccessor;
 import io.lettuce.core.ReadFrom;
@@ -133,20 +131,19 @@ class MasterReplicaConnectionProvider<K, V> {
 
             try {
 
-                Flux<StatefulRedisConnection<K, V>> connections = Flux.empty();
-
+                // Collect all connection futures
+                List<CompletableFuture<StatefulRedisConnection<K, V>>> connectionFutures = new ArrayList<>();
                 for (RedisNodeDescription node : selection) {
-                    connections = connections.concatWith(Mono.fromFuture(getConnection(node)));
+                    connectionFutures.add(getConnection(node));
                 }
 
                 if (OrderingReadFromAccessor.isOrderSensitive(readFrom) || selection.size() == 1) {
-                    return connections.filter(StatefulConnection::isOpen).next().switchIfEmpty(connections.next()).toFuture();
+                    // Return first open connection, or first connection if none are open
+                    return findFirstOpen(connectionFutures, 0);
                 }
 
-                return connections.filter(StatefulConnection::isOpen).collectList().filter(it -> !it.isEmpty()).map(it -> {
-                    int index = ThreadLocalRandom.current().nextInt(it.size());
-                    return it.get(index);
-                }).switchIfEmpty(connections.next()).toFuture();
+                // Collect all open connections, pick random; fallback to first connection
+                return collectOpenConnections(connectionFutures);
             } catch (RuntimeException e) {
                 throw Exceptions.bubble(e);
             }
@@ -161,6 +158,54 @@ class MasterReplicaConnectionProvider<K, V> {
 
         return connectionProvider.getConnection(toConnectionKey(uri)).toCompletableFuture();
     }
+
+    /**
+     * Find the first open connection from the list, starting at the given index. Falls back to the first connection if none are
+     * open.
+     */
+    private CompletableFuture<StatefulRedisConnection<K, V>> findFirstOpen(
+            List<CompletableFuture<StatefulRedisConnection<K, V>>> futures, int index) {
+
+        if (index >= futures.size()) {
+            // No open connection found, fall back to first
+            return futures.get(0);
+        }
+
+        return futures.get(index).thenCompose(conn -> {
+            if (conn.isOpen()) {
+                return CompletableFuture.completedFuture(conn);
+            }
+            return findFirstOpen(futures, index + 1);
+        });
+    }
+
+    /**
+     * Collect all open connections and pick a random one. Falls back to the first connection if none are open.
+     */
+    private CompletableFuture<StatefulRedisConnection<K, V>> collectOpenConnections(
+            List<CompletableFuture<StatefulRedisConnection<K, V>>> futures) {
+
+        CompletableFuture<?>[] arr = futures.toArray(new CompletableFuture[0]);
+        return CompletableFuture.allOf(arr).thenApply(v -> {
+
+            List<StatefulRedisConnection<K, V>> open = new ArrayList<>();
+            for (CompletableFuture<StatefulRedisConnection<K, V>> f : futures) {
+                StatefulRedisConnection<K, V> conn = f.join();
+                if (conn.isOpen()) {
+                    open.add(conn);
+                }
+            }
+
+            if (!open.isEmpty()) {
+                int idx = ThreadLocalRandom.current().nextInt(open.size());
+                return open.get(idx);
+            }
+
+            // Fallback to first connection
+            return futures.get(0).join();
+        });
+    }
+
 
     /**
      * @return number of connections.

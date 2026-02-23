@@ -1,12 +1,12 @@
 package io.lettuce.core.masterreplica;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 
-import reactor.core.publisher.Mono;
 import io.lettuce.core.api.AsyncCloseable;
 
 /**
- * Utility to resume a {@link org.reactivestreams.Publisher} after termination.
+ * Utility to close an {@link AsyncCloseable} and then emit a value or error through a {@link CompletableFuture}.
  *
  * @author Mark Paluch
  */
@@ -32,40 +32,30 @@ class ResumeAfter {
         return new ResumeAfter(closeable);
     }
 
-    public <T> Mono<T> thenEmit(T value) {
+    public <T> CompletableFuture<T> thenEmit(T value) {
 
-        return Mono.defer(() -> {
+        CompletableFuture<T> result = new CompletableFuture<>();
 
-            if (firstCloseLatch()) {
-                return Mono.fromCompletionStage(closeable.closeAsync());
-            }
+        if (firstCloseLatch()) {
+            closeable.closeAsync().whenComplete((v, ex) -> result.complete(value));
+        } else {
+            result.complete(value);
+        }
 
-            return Mono.empty();
-
-        }).then(Mono.just(value)).doFinally(s -> {
-
-            if (firstCloseLatch()) {
-                closeable.closeAsync();
-            }
-        });
+        return result;
     }
 
-    public <T> Mono<T> thenError(Throwable t) {
+    public <T> CompletableFuture<T> thenError(Throwable t) {
 
-        return Mono.defer(() -> {
+        CompletableFuture<T> result = new CompletableFuture<>();
 
-            if (firstCloseLatch()) {
-                return Mono.fromCompletionStage(closeable.closeAsync());
-            }
+        if (firstCloseLatch()) {
+            closeable.closeAsync().whenComplete((v, ex) -> result.completeExceptionally(t));
+        } else {
+            result.completeExceptionally(t);
+        }
 
-            return Mono.empty();
-
-        }).then(Mono.<T> error(t)).doFinally(s -> {
-
-            if (firstCloseLatch()) {
-                closeable.closeAsync();
-            }
-        });
+        return result;
     }
 
     private boolean firstCloseLatch() {

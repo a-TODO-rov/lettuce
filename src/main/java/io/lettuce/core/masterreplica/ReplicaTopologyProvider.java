@@ -25,7 +25,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import reactor.core.publisher.Mono;
 import io.lettuce.core.RedisFuture;
 import io.lettuce.core.RedisURI;
 import io.lettuce.core.api.StatefulRedisConnection;
@@ -122,7 +121,7 @@ class ReplicaTopologyProvider implements TopologyProvider {
         RedisFuture<String> info = connection.async().info("replication");
 
         try {
-            return Mono.fromCompletionStage(info).timeout(redisURI.getTimeout()).map(this::getNodesFromInfo).toFuture();
+            return info.toCompletableFuture().thenApply(this::getNodesFromInfo);
         } catch (RuntimeException e) {
             throw Exceptions.bubble(e);
         }
