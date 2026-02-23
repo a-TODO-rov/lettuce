@@ -21,16 +21,23 @@ public interface EventBus {
 
 ---
 
-## Affected Files (2 files)
+## Potentially Affected Areas
 
-| File | Reactor Types | Notes |
-|------|---------------|-------|
-| `src/main/java/io/lettuce/core/event/EventBus.java` | `Flux` | **Public interface** |
-| `src/main/java/io/lettuce/core/event/DefaultEventBus.java` | `Flux`, `Sinks`, `Scheduler` | Uses optimized Reactor primitives |
+### Core EventBus
+- `EventBus` interface - Public interface with `Flux` return type
+- `DefaultEventBus` - Uses `Flux`, `Sinks`, `Scheduler` (optimized Reactor primitives)
+
+### New Components to Create
+- `CallbackEventBus` - Reactor-free implementation using callbacks
+- `EventBusFactory` - SPI loader for implementation selection
+- `EventBusReactiveAdapter` - Flux adapter in reactive island
+
+### Integration Points
+- `DefaultClientResources` - Creates EventBus instance
 
 ---
 
-## Implementation Strategy
+## Implementation Approach
 
 ### Dual Implementation via SPI Pattern
 
@@ -58,14 +65,14 @@ public interface EventBus {
 ## Breaking vs Non-Breaking Changes
 
 ### Non-Breaking (7.x)
-- Add `subscribe(Consumer<Event>)` method to `EventBus` ✅
-- Add `@Deprecated` to `get()` method ✅
-- Create new `CallbackEventBus` implementation ✅
-- Create `EventBusFactory` for SPI selection ✅
+- Add `subscribe(Consumer<Event>)` method to `EventBus`
+- Add `@Deprecated` to `get()` method
+- Create new `CallbackEventBus` implementation
+- Create `EventBusFactory` for SPI selection
 
 ### Breaking (8.0)
-- Remove `get()` method from `EventBus` ⚠️
-- Remove `Flux` import from `EventBus.java` ⚠️
+- Remove `get()` method from `EventBus`
+- Remove `Flux` import from `EventBus.java`
 
 ---
 
@@ -91,38 +98,26 @@ Users currently using `eventBus.get().subscribe(...)` need migration path.
 
 ---
 
-## New Files to Create
+## Scope Summary
 
-| File | Purpose |
-|------|---------|
-| `src/main/java/io/lettuce/core/event/CallbackEventBus.java` | Reactor-free implementation |
-| `src/main/java/io/lettuce/core/event/EventBusFactory.java` | SPI loader |
-| `src/main/java/io/lettuce/core/api/reactive/EventBusReactiveAdapter.java` | Flux adapter (in reactive island) |
+### 7.x (Deprecation)
 
----
+| Scope | Description |
+|-------|-------------|
+| Interface update | Add `subscribe()`, deprecate `get()` |
+| Callback implementation | Create Reactor-free `CallbackEventBus` |
+| Factory | Create SPI-based `EventBusFactory` |
+| Adapter | Create `EventBusReactiveAdapter` for Flux users |
+| Integration | Update `DefaultClientResources` |
+| Verification | Benchmark callback vs Reactor performance |
 
-## Task Summary
+### 8.0 (Breaking)
 
-### 7.x Tasks (Deprecation)
-
-| Task | Description |
-|------|-------------|
-| G5-1 | Add `subscribe(Consumer<Event>)` to `EventBus` interface |
-| G5-2 | Deprecate `get()` method |
-| G5-3 | Implement `subscribe()` in `DefaultEventBus` |
-| G5-4 | Create `CallbackEventBus` |
-| G5-5 | Create `EventBusFactory` |
-| G5-6 | Create `EventBusReactiveAdapter` |
-| G5-7 | Update `DefaultClientResources` to use factory |
-| G5-8 | Create benchmark |
-
-### 8.0 Tasks (Breaking)
-
-| Task | Description |
-|------|-------------|
-| G5-9 | Remove `get()` from `EventBus` interface |
-| G5-10 | Remove Flux import |
-| G5-11 | Update all usages of `eventBus.get()` |
+| Scope | Description |
+|-------|-------------|
+| Remove deprecated | Remove `get()` from interface |
+| Remove imports | Remove `Flux` import from `EventBus.java` |
+| Update usages | Update all code using `eventBus.get()` |
 
 ---
 

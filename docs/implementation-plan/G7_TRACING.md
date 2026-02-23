@@ -1,7 +1,7 @@
 # G7 - Tracing Implementation Plan
 
-**Status:** Required - Public interface uses Mono  
-**Dependencies:** G2 (Connection Interfaces)  
+**Status:** Required - Public interface uses Mono
+**Dependencies:** G2 (Connection Interfaces)
 **Blocks:** None
 
 ---
@@ -25,18 +25,22 @@ Additionally, the implementations (`BraveTracing`, `MicrometerTracing`) use `Mon
 
 ---
 
-## Affected Files (4 files)
+## Potentially Affected Areas
 
-| File | Reactor Types | Notes |
-|------|---------------|-------|
-| `src/main/java/io/lettuce/core/tracing/Tracing.java` | `Mono`, `Context` | **Public interface** |
-| `src/main/java/io/lettuce/core/tracing/TraceContextProvider.java` | `Mono` | **Public interface** |
-| `src/main/java/io/lettuce/core/tracing/BraveTracing.java` | `Mono` | Brave implementation |
-| `src/main/java/io/lettuce/core/tracing/MicrometerTracing.java` | `Mono` | Micrometer implementation |
+### Public Interfaces
+- `Tracing` - Uses `Mono`, `Context`
+- `TraceContextProvider` - Uses `Mono`
+
+### Implementations
+- `BraveTracing` - Brave implementation
+- `MicrometerTracing` - Micrometer implementation
+
+### Internal Callers
+- Code that calls `getTraceContextLater()` needs updates
 
 ---
 
-## Implementation Strategy
+## Implementation Approach
 
 ### Replace Mono with CompletionStage
 
@@ -52,7 +56,7 @@ public interface TraceContextProvider {
 public interface TraceContextProvider {
     @Deprecated
     Mono<TraceContext> getTraceContextLater();
-    
+
     CompletionStage<TraceContext> getTraceContextAsync();  // New
 }
 
@@ -77,13 +81,13 @@ public interface TraceContextProvider {
 ## Breaking vs Non-Breaking Changes
 
 ### Non-Breaking (7.x)
-- Add `getTraceContextAsync()` to `TraceContextProvider` ✅
-- Deprecate `getTraceContextLater()` ✅
-- Update implementations to support both ✅
+- Add `getTraceContextAsync()` to `TraceContextProvider`
+- Deprecate `getTraceContextLater()`
+- Update implementations to support both
 
 ### Breaking (8.0)
-- Remove `getTraceContextLater()` method ⚠️
-- Remove Reactor imports from base interfaces ⚠️
+- Remove `getTraceContextLater()` method
+- Remove Reactor imports from base interfaces
 
 ---
 
@@ -105,24 +109,22 @@ Find all internal code that calls `getTraceContextLater()` and update to `getTra
 
 ---
 
-## Task Summary
+## Scope Summary
 
-### 7.x Tasks (Deprecation)
+### 7.x (Deprecation)
 
-| Task | Description |
-|------|-------------|
-| G7-1 | Add `getTraceContextAsync()` to `TraceContextProvider` |
-| G7-2 | Deprecate `getTraceContextLater()` |
-| G7-3 | Update `BraveTracing` to implement new method |
-| G7-4 | Update `MicrometerTracing` to implement new method |
-| G7-5 | Update internal callers |
+| Scope | Description |
+|-------|-------------|
+| Interface update | Add async method, deprecate Mono method |
+| Implementations | Update `BraveTracing`, `MicrometerTracing` |
+| Internal callers | Update to use new async method |
 
-### 8.0 Tasks (Breaking)
+### 8.0 (Breaking)
 
-| Task | Description |
-|------|-------------|
-| G7-6 | Remove deprecated methods |
-| G7-7 | Remove Reactor imports |
+| Scope | Description |
+|-------|-------------|
+| Remove deprecated | Remove `getTraceContextLater()` |
+| Remove imports | Remove Reactor imports |
 
 ---
 

@@ -18,45 +18,33 @@
 
 ---
 
-## Affected Files (10 files + 2 new)
+## Potentially Affected Areas
 
 ### Client Classes
-
-| File | Reactor Types | Purpose |
-|------|---------------|---------|
-| `src/main/java/io/lettuce/core/RedisClient.java` | `Mono` | Sentinel connection loops, master lookup |
-| `src/main/java/io/lettuce/core/cluster/RedisClusterClient.java` | `Mono` | Cluster connection retry |
-| `src/main/java/io/lettuce/core/AbstractRedisClient.java` | `Mono` | `Mono<SocketAddress>` in connection builder |
+- `RedisClient` - Sentinel connection loops, master lookup
+- `RedisClusterClient` - Cluster connection retry
+- `AbstractRedisClient` - `Mono<SocketAddress>` in connection builder
 
 ### Connection Infrastructure
+- `ConnectionBuilder` - Socket address supplier
+- `ConnectionWatchdog` - Reconnection logic (uses `Mono`, `Tuple2`)
+- `MaintenanceAwareConnectionWatchdog` - Extends ConnectionWatchdog
+- `ReconnectionHandler` - Reconnect with timeout (uses `Mono`, `Tuple2`, `Tuples`)
+- `AbstractClusterNodeConnectionFactory` - Cluster node address resolution
 
-| File | Reactor Types | Purpose |
-|------|---------------|---------|
-| `src/main/java/io/lettuce/core/ConnectionBuilder.java` | `Mono` | Socket address supplier |
-| `src/main/java/io/lettuce/core/protocol/ConnectionWatchdog.java` | `Mono`, `Tuple2` | Reconnection logic |
-| `src/main/java/io/lettuce/core/protocol/MaintenanceAwareConnectionWatchdog.java` | `Mono` | Extends ConnectionWatchdog |
-| `src/main/java/io/lettuce/core/protocol/ReconnectionHandler.java` | `Mono`, `Tuple2`, `Tuples` | Reconnect with timeout |
-| `src/main/java/io/lettuce/core/cluster/AbstractClusterNodeConnectionFactory.java` | `Mono` | Cluster node address resolution |
-
-### Additional Files (from analysis)
-
-| File | Reactor Types | Purpose |
-|------|---------------|---------|
-| `src/main/java/io/lettuce/core/RedisURI.java` | `Mono` | Credential resolution |
-| `src/main/java/io/lettuce/core/ClientOptions.java` | `Mono` | Socket address supplier |
+### Additional Areas
+- `RedisURI` - Credential resolution
+- `ClientOptions` - Socket address supplier
 
 ### New Utility Classes
-
-| File | Purpose |
-|------|---------|
-| `src/main/java/io/lettuce/core/internal/Pair.java` | Replace Reactor's `Tuple2` |
-| `src/main/java/io/lettuce/core/internal/Futures.java` | Async utility methods |
+- `Pair<T1, T2>` - Replace Reactor's `Tuple2`
+- `Futures` utility class - Async utility methods (retry, composition)
 
 ---
 
-## Implementation Strategy
+## Implementation Approach
 
-### Core Pattern: `Mono<SocketAddress>` → `Supplier<CompletionStage<SocketAddress>>`
+### Core Pattern: `Mono<SocketAddress>` to `Supplier<CompletionStage<SocketAddress>>`
 
 The connection infrastructure uses `Mono<SocketAddress>` for **lazy async address resolution**. The `Supplier` wrapper preserves this laziness:
 
@@ -85,12 +73,12 @@ Supplier<CompletionStage<SocketAddress>> socketAddressSupplier;
 ## Breaking vs Non-Breaking Changes
 
 ### Non-Breaking (All changes)
-- All Reactor usage is internal implementation ✅
-- No public API changes ✅
-- Clients continue to use `connect()`, `connectAsync()`, etc. ✅
+- All Reactor usage is internal implementation
+- No public API changes
+- Clients continue to use `connect()`, `connectAsync()`, etc.
 
 ### Breaking
-- **None** ✅
+- **None**
 
 ---
 
@@ -134,53 +122,30 @@ Reactor's `onErrorMap()` wraps exceptions. Ensure CF replacement preserves excep
 
 ---
 
-## Task Summary
+## Scope Summary
 
-### Phase 1: Utility Classes (Prerequisites)
-
-| Task | Description |
-|------|-------------|
-| G3-1 | Create `Pair<T1, T2>` utility class (Tuple2 replacement) |
-| G3-2 | Create `Futures` utility class with `retryAsync()` and `firstSuccessful()` |
-
-### Phase 2: Connection Infrastructure
-
-| Task | Description |
-|------|-------------|
-| G3-3 | Refactor `ConnectionBuilder` - change socket address supplier type |
-| G3-4 | Refactor `ReconnectionHandler` - replace Mono/Tuple2 with CF/Pair |
-| G3-5 | Refactor `ConnectionWatchdog` - replace Mono/Tuple2 |
-| G3-6 | Refactor `MaintenanceAwareConnectionWatchdog` |
-| G3-7 | Refactor `AbstractClusterNodeConnectionFactory` |
-
-### Phase 3: Client Classes
-
-| Task | Description |
-|------|-------------|
-| G3-8 | Refactor `AbstractRedisClient` - update socket address parameters |
-| G3-9 | Refactor `RedisClient` - replace Mono chains with CF |
-| G3-10 | Change `lookupRedis()` to use `async()` instead of `reactive()` |
-| G3-11 | Refactor `RedisClusterClient` - replace Mono retry loops |
-
-### Phase 4: Additional Files & Cleanup
-
-| Task | Description |
-|------|-------------|
-| G3-12 | Refactor `RedisURI` and `ClientOptions` |
-| G3-13 | Remove Reactor imports from all refactored files |
-| G3-14 | Verify all integration tests pass |
+| Scope | Description |
+|-------|-------------|
+| Utility classes | Create `Pair` and `Futures` utilities |
+| Connection infrastructure | Refactor connection building, watchdog, reconnection |
+| Client classes | Refactor `RedisClient`, `RedisClusterClient`, `AbstractRedisClient` |
+| Sentinel integration | Change `lookupRedis()` from reactive to async API |
+| Cleanup | Remove Reactor imports, verify tests |
 
 ---
 
 ## Dependency Order
 
 ```
-Phase 1: G3-1, G3-2 (parallel)
-    ↓
-Phase 2: G3-3 first, then G3-4 to G3-7 (parallel)
-    ↓
-Phase 3: G3-8 to G3-11 (RedisClient and RedisClusterClient can be parallel)
-    ↓
-Phase 4: G3-12 to G3-14
+Utilities (Pair, Futures)
+    |
+    v
+Connection Infrastructure (ConnectionBuilder, Watchdog, etc.)
+    |
+    v
+Client Classes (RedisClient, RedisClusterClient)
+    |
+    v
+Cleanup and Verification
 ```
 

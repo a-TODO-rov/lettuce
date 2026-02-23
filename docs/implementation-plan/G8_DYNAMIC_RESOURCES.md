@@ -1,7 +1,7 @@
 # G8 - Dynamic Commands & Resources Implementation Plan
 
-**Status:** Required - Supports reactive API + Scheduler integration  
-**Dependencies:** G2 (Connection Interfaces), G5 (EventBus)  
+**Status:** Required - Supports reactive API + Scheduler integration
+**Dependencies:** G2 (Connection Interfaces), G5 (EventBus)
 **Blocks:** None
 
 ---
@@ -20,24 +20,18 @@ Type detection utilities that check if types are reactive (Flux/Mono). Used by d
 
 ---
 
-## Affected Files (3 files)
+## Potentially Affected Areas
 
 ### Dynamic Commands
-
-| File | Reactor Types | Notes |
-|------|---------------|-------|
-| `src/main/java/io/lettuce/core/dynamic/ReactiveTypes.java` | `Flux`, `Mono` | Type detection |
-| `src/main/java/io/lettuce/core/dynamic/ReactiveTypeAdapters.java` | `Flux`, `Mono` | Type conversion |
+- `ReactiveTypes` - Type detection for `Flux`, `Mono`
+- `ReactiveTypeAdapters` - Type conversion utilities
 
 ### Resources
-
-| File | Reactor Types | Notes |
-|------|---------------|-------|
-| `src/main/java/io/lettuce/core/resource/DefaultClientResources.java` | `Schedulers` | Creates Reactor scheduler |
+- `DefaultClientResources` - Creates Reactor scheduler
 
 ---
 
-## Implementation Strategy
+## Implementation Approach
 
 ### Dynamic Commands
 
@@ -50,14 +44,14 @@ These files support the reactive API feature (G1). They should:
 ```java
 public class ReactiveTypes {
     private static final boolean REACTOR_PRESENT = isReactorPresent();
-    
+
     public static boolean isReactiveType(Class<?> type) {
         if (!REACTOR_PRESENT) {
             return false;
         }
         return isFlux(type) || isMono(type);
     }
-    
+
     private static boolean isReactorPresent() {
         try {
             Class.forName("reactor.core.publisher.Mono");
@@ -92,12 +86,12 @@ EventBus eventBus = EventBusFactory.create(eventExecutorGroup);
 ## Breaking vs Non-Breaking Changes
 
 ### Non-Breaking (All changes)
-- Guard `ReactiveTypes` with `Class.forName()` ✅
-- Guard `ReactiveTypeAdapters` with `Class.forName()` ✅
-- Update `DefaultClientResources` to use `EventBusFactory` ✅
+- Guard `ReactiveTypes` with `Class.forName()`
+- Guard `ReactiveTypeAdapters` with `Class.forName()`
+- Update `DefaultClientResources` to use `EventBusFactory`
 
 ### Breaking
-- **None** ✅
+- **None**
 
 ---
 
@@ -122,21 +116,13 @@ Currently provides `Scheduler computationScheduler()`. After refactoring:
 
 ---
 
-## Task Summary
+## Scope Summary
 
-### Phase 1: Dynamic Commands (Guard with Class.forName)
-
-| Task | Description |
-|------|-------------|
-| G8-1 | Guard `ReactiveTypes` with Reactor presence check |
-| G8-2 | Guard `ReactiveTypeAdapters` with Reactor presence check |
-
-### Phase 2: Resources (After G5)
-
-| Task | Description |
-|------|-------------|
-| G8-3 | Update `DefaultClientResources` to use `EventBusFactory` |
-| G8-4 | Handle `computationScheduler()` for non-Reactor users |
+| Scope | Description |
+|-------|-------------|
+| Dynamic commands | Guard `ReactiveTypes` and `ReactiveTypeAdapters` with presence checks |
+| Resources | Update `DefaultClientResources` to use `EventBusFactory` |
+| Scheduler | Handle `computationScheduler()` for non-Reactor users |
 
 ---
 

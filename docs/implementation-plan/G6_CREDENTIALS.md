@@ -1,7 +1,7 @@
 # G6 - Credentials & Authentication Implementation Plan
 
-**Status:** Required - Public interface with streaming credentials  
-**Dependencies:** G2 (Connection Interfaces)  
+**Status:** Required - Public interface with streaming credentials
+**Dependencies:** G2 (Connection Interfaces)
 **Blocks:** None
 
 ---
@@ -21,18 +21,21 @@ public interface RedisCredentialsProvider {
 
 ---
 
-## Affected Files (4 files)
+## Potentially Affected Areas
 
-| File | Reactor Types | Notes |
-|------|---------------|-------|
-| `src/main/java/io/lettuce/core/RedisCredentialsProvider.java` | `Flux`, `Mono` | **Public interface** |
-| `src/main/java/io/lettuce/core/StaticCredentialsProvider.java` | `Mono` | Static credentials (no rotation) |
-| `src/main/java/io/lettuce/core/RedisAuthenticationHandler.java` | `Disposable`, `Flux` | Subscribes to credential stream |
-| `src/main/java/io/lettuce/authx/TokenBasedRedisCredentialsProvider.java` | `Flux`, `Mono`, `Sinks` | Token-based auth |
+### Core Interface
+- `RedisCredentialsProvider` - Public interface with `Flux`, `Mono` return types
+
+### Implementations
+- `StaticCredentialsProvider` - Static credentials (no rotation)
+- `TokenBasedRedisCredentialsProvider` - Token-based auth with streaming
+
+### Consumers
+- `RedisAuthenticationHandler` - Subscribes to credential stream
 
 ---
 
-## Implementation Strategy
+## Implementation Approach
 
 ### Replace Single-Value Methods
 
@@ -77,14 +80,14 @@ public interface ReactiveRedisCredentialsProvider extends RedisCredentialsProvid
 ## Breaking vs Non-Breaking Changes
 
 ### Non-Breaking (7.x)
-- Add `resolveCredentialsAsync()` to interface ✅
-- Add `subscribeToCredentials(Consumer)` to interface ✅
-- Deprecate `resolveCredentials()` and `credentials()` ✅
+- Add `resolveCredentialsAsync()` to interface
+- Add `subscribeToCredentials(Consumer)` to interface
+- Deprecate `resolveCredentials()` and `credentials()`
 
 ### Breaking (8.0)
-- Remove `resolveCredentials()` method ⚠️
-- Remove `credentials()` method ⚠️
-- Remove Reactor imports ⚠️
+- Remove `resolveCredentials()` method
+- Remove `credentials()` method
+- Remove Reactor imports
 
 ---
 
@@ -106,25 +109,22 @@ Users who have implemented `RedisCredentialsProvider` need migration path:
 
 ---
 
-## Task Summary
+## Scope Summary
 
-### 7.x Tasks (Deprecation)
+### 7.x (Deprecation)
 
-| Task | Description |
-|------|-------------|
-| G6-1 | Add `resolveCredentialsAsync()` to interface |
-| G6-2 | Add `subscribeToCredentials(Consumer)` to interface |
-| G6-3 | Deprecate `resolveCredentials()` and `credentials()` |
-| G6-4 | Update `StaticCredentialsProvider` |
-| G6-5 | Update `TokenBasedRedisCredentialsProvider` |
-| G6-6 | Update `RedisAuthenticationHandler` to use callbacks |
+| Scope | Description |
+|-------|-------------|
+| Interface update | Add async methods, deprecate Reactor methods |
+| Implementations | Update all credential providers |
+| Consumers | Update authentication handler to use callbacks |
 
-### 8.0 Tasks (Breaking)
+### 8.0 (Breaking)
 
-| Task | Description |
-|------|-------------|
-| G6-7 | Remove deprecated methods |
-| G6-8 | Remove Reactor imports |
+| Scope | Description |
+|-------|-------------|
+| Remove deprecated | Remove Reactor-based methods |
+| Remove imports | Remove `Flux`/`Mono` imports |
 
 ---
 
