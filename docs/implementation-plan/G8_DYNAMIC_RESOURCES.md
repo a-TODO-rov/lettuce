@@ -1,0 +1,154 @@
+# G8 - Dynamic Commands & Resources Implementation Plan
+
+**Status:** Required - Supports reactive API + Scheduler integration  
+**Dependencies:** G2 (Connection Interfaces), G5 (EventBus)  
+**Blocks:** None
+
+---
+
+## Problem Statement
+
+This group covers two areas:
+
+### 1. Dynamic Commands (ReactiveTypes)
+
+Type detection utilities that check if types are reactive (Flux/Mono). Used by dynamic command generation.
+
+### 2. Resources (DefaultClientResources)
+
+`DefaultClientResources` creates and provides a Reactor `Scheduler` for reactive operations.
+
+---
+
+## Affected Files (3 files)
+
+### Dynamic Commands
+
+| File | Reactor Types | Notes |
+|------|---------------|-------|
+| `src/main/java/io/lettuce/core/dynamic/ReactiveTypes.java` | `Flux`, `Mono` | Type detection |
+| `src/main/java/io/lettuce/core/dynamic/ReactiveTypeAdapters.java` | `Flux`, `Mono` | Type conversion |
+
+### Resources
+
+| File | Reactor Types | Notes |
+|------|---------------|-------|
+| `src/main/java/io/lettuce/core/resource/DefaultClientResources.java` | `Schedulers` | Creates Reactor scheduler |
+
+---
+
+## Implementation Strategy
+
+### Dynamic Commands
+
+These files support the reactive API feature (G1). They should:
+- Remain in the codebase (required for reactive API)
+- Be loaded only when Reactor is present
+- Use `Class.forName()` checks before touching Reactor types
+
+**Pattern:**
+```java
+public class ReactiveTypes {
+    private static final boolean REACTOR_PRESENT = isReactorPresent();
+    
+    public static boolean isReactiveType(Class<?> type) {
+        if (!REACTOR_PRESENT) {
+            return false;
+        }
+        return isFlux(type) || isMono(type);
+    }
+    
+    private static boolean isReactorPresent() {
+        try {
+            Class.forName("reactor.core.publisher.Mono");
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
+    }
+}
+```
+
+### Resources
+
+`DefaultClientResources` creates a `Scheduler` for the `EventBus`. After G5 refactoring:
+- `EventBusFactory` handles Reactor presence detection
+- `DefaultClientResources` should not directly reference `Scheduler` type
+- Pass `Executor` to factory, let factory decide implementation
+
+**Current:**
+```java
+Scheduler scheduler = Schedulers.fromExecutorService(eventExecutorGroup);
+EventBus eventBus = new DefaultEventBus(scheduler);
+```
+
+**After G5:**
+```java
+EventBus eventBus = EventBusFactory.create(eventExecutorGroup);
+```
+
+---
+
+## Breaking vs Non-Breaking Changes
+
+### Non-Breaking (All changes)
+- Guard `ReactiveTypes` with `Class.forName()` ✅
+- Guard `ReactiveTypeAdapters` with `Class.forName()` ✅
+- Update `DefaultClientResources` to use `EventBusFactory` ✅
+
+### Breaking
+- **None** ✅
+
+---
+
+## Hotspots & Considerations
+
+### 1. Class Loading in ReactiveTypes
+
+Current code may directly reference `Flux.class` or `Mono.class`. This causes class loading.
+
+**Solution:** Use string-based class names with `Class.forName()`.
+
+### 2. DefaultClientResources Scheduler
+
+Currently provides `Scheduler computationScheduler()`. After refactoring:
+- Keep method for backward compatibility
+- Return `null` if Reactor not present
+- Or deprecate and provide alternative
+
+### 3. ScanStream
+
+`ScanStream` in G2/G3 uses Flux for scan iteration. This is a reactive API feature and should stay in reactive island.
+
+---
+
+## Task Summary
+
+### Phase 1: Dynamic Commands (Guard with Class.forName)
+
+| Task | Description |
+|------|-------------|
+| G8-1 | Guard `ReactiveTypes` with Reactor presence check |
+| G8-2 | Guard `ReactiveTypeAdapters` with Reactor presence check |
+
+### Phase 2: Resources (After G5)
+
+| Task | Description |
+|------|-------------|
+| G8-3 | Update `DefaultClientResources` to use `EventBusFactory` |
+| G8-4 | Handle `computationScheduler()` for non-Reactor users |
+
+---
+
+## Migration Guide
+
+**No migration required** - all changes are internal and non-breaking.
+
+For users accessing `computationScheduler()` without Reactor:
+```java
+Scheduler scheduler = clientResources.computationScheduler();
+if (scheduler == null) {
+    // Reactor not present, use alternative
+}
+```
+

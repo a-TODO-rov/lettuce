@@ -1,7 +1,7 @@
 # G2 - Connection Interfaces Implementation Plan
 
-**Status:** Critical Blocker - Must be completed first  
-**Dependencies:** None  
+**Status:** Critical Blocker - Must be completed first
+**Dependencies:** None
 **Blocks:** G3, G4, G5, G6, G7, G8
 
 ---
@@ -14,90 +14,66 @@ This is the **fundamental blocker** that prevents Reactor from being optional.
 
 ---
 
-## Breaking Changes (8.0)
+## Solution: Dual Interface Approach
 
-### Interfaces - Remove `reactive()` method
+Split each connection interface into two:
+- **Base interface** - Contains `sync()` and `async()` methods only, NO Reactor imports
+- **Reactive interface** - Extends base, adds `reactive()` method, HAS Reactor imports
 
-| Interface | File | Line | Change |
-|-----------|------|------|--------|
-| `StatefulRedisConnection` | `src/main/java/io/lettuce/core/api/StatefulRedisConnection.java` | 47 | Remove `RedisReactiveCommands<K, V> reactive()` |
-| `StatefulRedisClusterConnection` | `src/main/java/io/lettuce/core/cluster/api/StatefulRedisClusterConnection.java` | 68 | Remove `RedisAdvancedClusterReactiveCommands<K, V> reactive()` |
-| `StatefulRedisPubSubConnection` | `src/main/java/io/lettuce/core/pubsub/StatefulRedisPubSubConnection.java` | 44 | Remove `RedisPubSubReactiveCommands<K, V> reactive()` |
-| `StatefulRedisSentinelConnection` | `src/main/java/io/lettuce/core/sentinel/api/StatefulRedisSentinelConnection.java` | 41 | Remove `RedisSentinelReactiveCommands<K, V> reactive()` |
-| `StatefulRedisClusterPubSubConnection` | `src/main/java/io/lettuce/core/cluster/pubsub/StatefulRedisClusterPubSubConnection.java` | 80 | Remove `RedisClusterPubSubReactiveCommands<K, V> reactive()` |
-
-### Interfaces - Remove Reactor imports
-
-| Interface | File | Line | Import to Remove |
-|-----------|------|------|------------------|
-| `StatefulRedisConnection` | `src/main/java/io/lettuce/core/api/StatefulRedisConnection.java` | 5 | `io.lettuce.core.api.reactive.RedisReactiveCommands` |
-| `StatefulRedisClusterConnection` | `src/main/java/io/lettuce/core/cluster/api/StatefulRedisClusterConnection.java` | 32 | `io.lettuce.core.cluster.api.reactive.RedisAdvancedClusterReactiveCommands` |
-| `StatefulRedisPubSubConnection` | `src/main/java/io/lettuce/core/pubsub/StatefulRedisPubSubConnection.java` | 5 | `io.lettuce.core.pubsub.api.reactive.RedisPubSubReactiveCommands` |
-| `StatefulRedisSentinelConnection` | `src/main/java/io/lettuce/core/sentinel/api/StatefulRedisSentinelConnection.java` | 6 | `io.lettuce.core.sentinel.api.reactive.RedisSentinelReactiveCommands` |
-| `StatefulRedisClusterPubSubConnection` | `src/main/java/io/lettuce/core/cluster/pubsub/StatefulRedisClusterPubSubConnection.java` | 12 | `io.lettuce.core.cluster.pubsub.api.reactive.RedisClusterPubSubReactiveCommands` |
+This approach:
+- Breaks the class loading chain at the interface level
+- Provides a clean, typed API for both reactive and non-reactive users
+- Sets up cleanly for a future `lettuce-reactive` module separation
 
 ---
 
-## Deprecations (7.x - ASAP Release)
+## Interface Hierarchy
 
-### Add `@Deprecated` to `reactive()` methods
-
-All 5 interfaces need deprecation annotations with clear migration message:
-
-```java
-/**
- * @deprecated Use {@code getExtension(RedisReactiveCommands.class)} instead.
- *             This method will be removed in Lettuce 8.0.
- *             Reactor dependency will become optional in 8.0.
- */
-@Deprecated
-RedisReactiveCommands<K, V> reactive();
+### Current Structure (problematic)
+```
+StatefulConnection<K,V>                    (base - no reactive)
+       ↑
+StatefulRedisConnection<K,V>              (has reactive() - THE PROBLEM)
+       ↑
+StatefulRedisConnectionImpl<K,V>          (implementation)
 ```
 
-### Files to modify:
-
-1. `src/main/java/io/lettuce/core/api/StatefulRedisConnection.java` - Line 47
-2. `src/main/java/io/lettuce/core/cluster/api/StatefulRedisClusterConnection.java` - Line 68
-3. `src/main/java/io/lettuce/core/pubsub/StatefulRedisPubSubConnection.java` - Line 44
-4. `src/main/java/io/lettuce/core/sentinel/api/StatefulRedisSentinelConnection.java` - Line 41
-5. `src/main/java/io/lettuce/core/cluster/pubsub/StatefulRedisClusterPubSubConnection.java` - Line 80
+### New Structure (dual interface)
+```
+StatefulConnection<K,V>                    (base - no reactive)
+       ↑
+StatefulRedisConnection<K,V>              (sync + async only, NO reactive)
+       ↑
+ReactiveStatefulRedisConnection<K,V>      (NEW - adds reactive())
+       ↑
+StatefulRedisConnectionImpl<K,V>          (implements ReactiveStatefulRedisConnection)
+```
 
 ---
 
-## Non-Breaking Additions (7.x)
+## Affected Files
 
-### 1. Add `getExtension()` to `StatefulConnection` interface
+### Base Interfaces (5 files) - Modify to remove `reactive()`
 
-**File:** `src/main/java/io/lettuce/core/api/StatefulConnection.java`
+| Interface | File |
+|-----------|------|
+| `StatefulRedisConnection` | `src/main/java/io/lettuce/core/api/StatefulRedisConnection.java` |
+| `StatefulRedisClusterConnection` | `src/main/java/io/lettuce/core/cluster/api/StatefulRedisClusterConnection.java` |
+| `StatefulRedisPubSubConnection` | `src/main/java/io/lettuce/core/pubsub/StatefulRedisPubSubConnection.java` |
+| `StatefulRedisSentinelConnection` | `src/main/java/io/lettuce/core/sentinel/api/StatefulRedisSentinelConnection.java` |
+| `StatefulRedisClusterPubSubConnection` | `src/main/java/io/lettuce/core/cluster/pubsub/StatefulRedisClusterPubSubConnection.java` |
 
-```java
-/**
- * Returns an extension of the specified type if available.
- * <p>
- * This method provides access to optional API extensions such as reactive commands.
- * Extensions are loaded lazily and may require additional dependencies on the classpath.
- * </p>
- * <p>
- * Example usage:
- * <pre>{@code
- * RedisReactiveCommands<K, V> reactive = connection.getExtension(RedisReactiveCommands.class);
- * if (reactive != null) {
- *     reactive.get("key").subscribe(System.out::println);
- * }
- * }</pre>
- * </p>
- *
- * @param extensionType the extension type class
- * @param <T> the extension type
- * @return the extension instance, or {@code null} if not available
- * @since 7.x
- */
-<T> T getExtension(Class<T> extensionType);
-```
+### Reactive Interfaces (5 NEW files) - Create in reactive packages
 
-### 2. Implement extension registry in implementation classes
+| New Interface | Location |
+|---------------|----------|
+| `ReactiveStatefulRedisConnection` | `src/main/java/io/lettuce/core/api/reactive/` |
+| `ReactiveStatefulRedisClusterConnection` | `src/main/java/io/lettuce/core/cluster/api/reactive/` |
+| `ReactiveStatefulRedisPubSubConnection` | `src/main/java/io/lettuce/core/pubsub/api/reactive/` |
+| `ReactiveStatefulRedisSentinelConnection` | `src/main/java/io/lettuce/core/sentinel/api/reactive/` |
+| `ReactiveStatefulRedisClusterPubSubConnection` | `src/main/java/io/lettuce/core/cluster/pubsub/api/reactive/` |
 
-**Files to modify:**
+### Implementations (5 files) - Change `implements` declaration
 
 | Implementation | File |
 |----------------|------|
@@ -107,187 +83,203 @@ RedisReactiveCommands<K, V> reactive();
 | `StatefulRedisSentinelConnectionImpl` | `src/main/java/io/lettuce/core/sentinel/StatefulRedisSentinelConnectionImpl.java` |
 | `StatefulRedisClusterPubSubConnectionImpl` | `src/main/java/io/lettuce/core/cluster/StatefulRedisClusterPubSubConnectionImpl.java` |
 
-**Implementation pattern:**
+### Client Classes (2 files) - Add `connectReactive()` methods (optional)
+
+| Client | File |
+|--------|------|
+| `RedisClient` | `src/main/java/io/lettuce/core/RedisClient.java` |
+| `RedisClusterClient` | `src/main/java/io/lettuce/core/cluster/RedisClusterClient.java` |
+
+---
+
+## Implementation Strategy
+
+### Phase 1: Create Reactive Interfaces (Non-Breaking)
+
+Create 5 new reactive interfaces that extend the base interfaces:
 
 ```java
-@Override
-@SuppressWarnings("unchecked")
-public <T> T getExtension(Class<T> extensionType) {
-    if (extensionType == RedisReactiveCommands.class) {
-        return (T) getOrCreateReactiveCommands();
-    }
-    return null;
-}
+// ReactiveStatefulRedisConnection.java (NEW)
+package io.lettuce.core.api.reactive;
 
-private RedisReactiveCommands<K, V> getOrCreateReactiveCommands() {
-    // Lazy initialization with Reactor presence check
-    if (reactive == null) {
-        synchronized (this) {
-            if (reactive == null) {
-                if (!isReactorPresent()) {
-                    return null; // or throw IllegalStateException
-                }
-                reactive = newRedisReactiveCommandsImpl();
-            }
-        }
-    }
-    return reactive;
-}
+import io.lettuce.core.api.StatefulRedisConnection;
 
-private static boolean isReactorPresent() {
-    try {
-        Class.forName("reactor.core.publisher.Flux");
-        return true;
-    } catch (ClassNotFoundException e) {
-        return false;
-    }
+public interface ReactiveStatefulRedisConnection<K, V>
+        extends StatefulRedisConnection<K, V> {
+
+    RedisReactiveCommands<K, V> reactive();
 }
 ```
 
-### 3. Modify deprecated `reactive()` to check Reactor presence
+### Phase 2: Update Implementations (Non-Breaking)
 
-**Implementation pattern for deprecated method:**
+Change implementations to implement the reactive interface (which extends base):
 
 ```java
-@Override
-@Deprecated
-public RedisReactiveCommands<K, V> reactive() {
-    RedisReactiveCommands<K, V> commands = getExtension(RedisReactiveCommands.class);
-    if (commands == null) {
-        throw new IllegalStateException(
-            "Reactive commands are not available. " +
-            "Please add reactor-core to your classpath to use reactive API. " +
-            "This method is deprecated and will be removed in Lettuce 8.0. " +
-            "Use getExtension(RedisReactiveCommands.class) instead."
-        );
-    }
-    return commands;
+// Before
+public class StatefulRedisConnectionImpl<K, V>
+        implements StatefulRedisConnection<K, V> { ... }
+
+// After
+public class StatefulRedisConnectionImpl<K, V>
+        implements ReactiveStatefulRedisConnection<K, V> { ... }
+```
+
+**Key insight**: Since `ReactiveStatefulRedisConnection` extends `StatefulRedisConnection`, the implementation still IS-A `StatefulRedisConnection`. Existing code continues to work.
+
+### Phase 3: Add connectReactive() Methods (Non-Breaking, Optional)
+
+```java
+// In RedisClient.java
+public ReactiveStatefulRedisConnection<String, String> connectReactive() {
+    return (ReactiveStatefulRedisConnection<String, String>) connect();
 }
+
+public <K, V> ReactiveStatefulRedisConnection<K, V> connectReactive(RedisCodec<K, V> codec) {
+    return (ReactiveStatefulRedisConnection<K, V>) connect(codec);
+}
+```
+
+### Phase 4: Remove `reactive()` from Base Interfaces (BREAKING - 8.0)
+
+Move `reactive()` method declaration from base interface to reactive interface.
+
+---
+
+## Breaking vs Non-Breaking Changes
+
+### Non-Breaking (7.x)
+- Creating new reactive interfaces ✅
+- Changing implementations to implement reactive interface ✅
+- Adding `connectReactive()` methods ✅
+- Deprecating `reactive()` in base interfaces ✅
+
+### Breaking (8.0)
+- Removing `reactive()` method from base interfaces ❌
+- Removing Reactor imports from base interfaces ❌
+
+**Migration path**: Users calling `connection.reactive()` must either:
+1. Cast to `ReactiveStatefulRedisConnection` first
+2. Use `client.connectReactive()` to get a typed reactive connection
+
+---
+
+## User Experience
+
+### Non-reactive users (NO changes needed)
+```java
+// Works exactly as before - Reactor never loaded
+StatefulRedisConnection<String, String> conn = client.connect();
+RedisCommands<String, String> sync = conn.sync();
+RedisAsyncCommands<String, String> async = conn.async();
+```
+
+### Reactive users - Option A: Cast
+```java
+// Cast to reactive interface
+ReactiveStatefulRedisConnection<String, String> conn =
+    (ReactiveStatefulRedisConnection<String, String>) client.connect();
+RedisReactiveCommands<String, String> reactive = conn.reactive();
+```
+
+### Reactive users - Option B: Typed connect (recommended)
+```java
+// Use new typed method
+ReactiveStatefulRedisConnection<String, String> conn = client.connectReactive();
+RedisReactiveCommands<String, String> reactive = conn.reactive();
 ```
 
 ---
 
-## Internal Refactoring
+## Hotspots & Considerations
 
-### Change reactive field initialization from eager to lazy
+### 1. `RedisChannelHandler` Type Parameter
+The `RedisChannelHandler` base class uses `StatefulConnection` as a type bound. Verify that reactive interfaces work correctly through the inheritance chain.
 
-**Current (eager):**
-```java
-// In constructor
-this.reactive = newRedisReactiveCommandsImpl();
-```
+### 2. Factory Methods
+`newStatefulRedisConnection()` in `RedisClient` and `RedisClusterClient` return `StatefulRedisConnectionImpl`. These should continue to work since the impl now implements the reactive interface.
 
-**New (lazy):**
-```java
-// Field becomes volatile for thread-safety
-protected volatile RedisReactiveCommandsImpl<K, V> reactive;
+### 3. Connection Pools
+`GenericObjectPool<StatefulRedisConnection<K,V>>` and similar pooling constructs will work with base interface. Users needing reactive must cast pooled connections.
 
-// Initialized only when getExtension() is called
-```
+### 4. Master-Replica & Sentinel
+`MasterReplica` and Sentinel connections follow the same pattern. Ensure consistency across all connection types.
 
-### Files affected:
-
-| File | Current Line | Change |
-|------|--------------|--------|
-| `StatefulRedisConnectionImpl.java` | 65, 109 | Make field volatile, remove constructor init |
-| `StatefulRedisClusterConnectionImpl.java` | 87, 126 | Make field volatile, remove constructor init |
-| `StatefulRedisSentinelConnectionImpl.java` | 53, 84 | Make field volatile, remove constructor init |
-
-**Note:** PubSub implementations inherit from `StatefulRedisConnectionImpl` and override `newRedisReactiveCommandsImpl()`, so they will automatically benefit from lazy initialization.
+### 5. Test Files
+Many tests use `connection.reactive()` directly. These will need updates in 8.0 to use the reactive interface type.
 
 ---
 
-## Files Affected Summary
+## Future Direction: Separate Module
 
-### Interfaces (5 files)
+This design enables a clean future module split:
 
-| File | Deprecation (7.x) | Breaking (8.0) |
-|------|-------------------|----------------|
-| `src/main/java/io/lettuce/core/api/StatefulConnection.java` | Add `getExtension()` | - |
-| `src/main/java/io/lettuce/core/api/StatefulRedisConnection.java` | Deprecate `reactive()` | Remove `reactive()` + import |
-| `src/main/java/io/lettuce/core/cluster/api/StatefulRedisClusterConnection.java` | Deprecate `reactive()` | Remove `reactive()` + import |
-| `src/main/java/io/lettuce/core/pubsub/StatefulRedisPubSubConnection.java` | Deprecate `reactive()` | Remove `reactive()` + import |
-| `src/main/java/io/lettuce/core/sentinel/api/StatefulRedisSentinelConnection.java` | Deprecate `reactive()` | Remove `reactive()` + import |
-| `src/main/java/io/lettuce/core/cluster/pubsub/StatefulRedisClusterPubSubConnection.java` | Deprecate `reactive()` | Remove `reactive()` + import |
+```
+Phase 1 (Now/7.x):
+┌─────────────────────────────────────────┐
+│  lettuce-core                           │
+│  ├── StatefulRedisConnection (base)     │  ← No Reactor imports
+│  ├── ReactiveStatefulRedisConnection    │  ← Has Reactor imports (optional dep)
+│  └── All implementations                │
+└─────────────────────────────────────────┘
 
-### Implementations (5 files)
+Phase 2 (Future/8.x+):
+┌───────────────────────┐     ┌─────────────────────────────┐
+│  lettuce-core         │ ←── │  lettuce-reactive           │
+│  (no Reactor)         │     │  (has Reactor)              │
+│  Base interfaces      │     │  Reactive interfaces        │
+│  Base impls           │     │  Reactive impls             │
+└───────────────────────┘     └─────────────────────────────┘
+```
 
-| File | Changes (7.x) |
-|------|---------------|
-| `src/main/java/io/lettuce/core/StatefulRedisConnectionImpl.java` | Implement `getExtension()`, lazy init, modify `reactive()` |
-| `src/main/java/io/lettuce/core/cluster/StatefulRedisClusterConnectionImpl.java` | Implement `getExtension()`, lazy init, modify `reactive()` |
-| `src/main/java/io/lettuce/core/pubsub/StatefulRedisPubSubConnectionImpl.java` | Implement `getExtension()`, modify `reactive()` |
-| `src/main/java/io/lettuce/core/sentinel/StatefulRedisSentinelConnectionImpl.java` | Implement `getExtension()`, lazy init, modify `reactive()` |
-| `src/main/java/io/lettuce/core/cluster/StatefulRedisClusterPubSubConnectionImpl.java` | Implement `getExtension()`, modify `reactive()` |
+The interfaces stay the same - files just move between modules.
 
 ---
 
-## Testing Requirements
+## Task Summary
 
-### New Tests
+### 7.x Tasks (Non-Breaking)
 
-1. **Test `getExtension()` returns reactive commands when Reactor present**
-2. **Test `getExtension()` returns `null` when Reactor absent** (requires separate test module or classloader isolation)
-3. **Test deprecated `reactive()` throws `IllegalStateException` when Reactor absent**
-4. **Test lazy initialization is thread-safe**
+| Task | Description |
+|------|-------------|
+| G2-1 | Create 5 new reactive interfaces in reactive packages |
+| G2-2 | Update 5 implementation classes to implement reactive interfaces |
+| G2-3 | Deprecate `reactive()` in base interfaces with migration message |
+| G2-4 | Add `connectReactive()` methods to `RedisClient` and `RedisClusterClient` |
+| G2-5 | Update documentation and migration guide |
 
-### Existing Tests to Verify
+### 8.0 Tasks (Breaking)
 
-- All existing reactive API tests should continue to pass
-- Integration tests using `connection.reactive()` should work with deprecation warnings
-
----
-
-## Migration Guide for Users
-
-### Before (current API):
-```java
-StatefulRedisConnection<String, String> connection = client.connect();
-RedisReactiveCommands<String, String> reactive = connection.reactive();
-reactive.get("key").subscribe(System.out::println);
-```
-
-### After (7.x - recommended):
-```java
-StatefulRedisConnection<String, String> connection = client.connect();
-RedisReactiveCommands<String, String> reactive = connection.getExtension(RedisReactiveCommands.class);
-if (reactive != null) {
-    reactive.get("key").subscribe(System.out::println);
-}
-```
-
-### After (8.0 - required):
-```java
-// Same as 7.x recommended approach
-// connection.reactive() will no longer exist
-```
+| Task | Description |
+|------|-------------|
+| G2-6 | Remove `reactive()` method from 5 base interfaces |
+| G2-7 | Remove Reactor imports from 5 base interfaces |
+| G2-8 | Update all tests to use reactive interface types |
+| G2-9 | Add classloader isolation test to verify Reactor not loaded |
 
 ---
 
-## Task Breakdown
+## Migration Guide
 
-### 7.x Tasks (Deprecations - ASAP)
+### 7.x (Deprecation Period)
+```java
+// Old way (deprecated, still works)
+StatefulRedisConnection<String, String> conn = client.connect();
+conn.reactive().get("key").subscribe();  // Deprecation warning
 
-| Task ID | Description | Files |
-|---------|-------------|-------|
-| G2-1 | Add `getExtension()` method to `StatefulConnection` interface | 1 |
-| G2-2 | Implement `getExtension()` in `StatefulRedisConnectionImpl` with lazy init | 1 |
-| G2-3 | Implement `getExtension()` in `StatefulRedisClusterConnectionImpl` with lazy init | 1 |
-| G2-4 | Implement `getExtension()` in `StatefulRedisPubSubConnectionImpl` | 1 |
-| G2-5 | Implement `getExtension()` in `StatefulRedisSentinelConnectionImpl` with lazy init | 1 |
-| G2-6 | Implement `getExtension()` in `StatefulRedisClusterPubSubConnectionImpl` | 1 |
-| G2-7 | Add `@Deprecated` to `reactive()` in all 5 interfaces | 5 |
-| G2-8 | Modify `reactive()` implementations to check Reactor presence | 5 |
-| G2-9 | Add unit tests for `getExtension()` | 1 |
-| G2-10 | Add integration tests for lazy initialization | 1 |
+// New way (recommended)
+ReactiveStatefulRedisConnection<String, String> conn = client.connectReactive();
+conn.reactive().get("key").subscribe();  // Clean
+```
 
-### 8.0 Tasks (Breaking Changes)
+### 8.0 (Breaking)
+```java
+// This will NOT compile - reactive() removed from base interface
+StatefulRedisConnection<String, String> conn = client.connect();
+conn.reactive();  // Compile error!
 
-| Task ID | Description | Files |
-|---------|-------------|-------|
-| G2-11 | Remove `reactive()` method from all 5 interfaces | 5 |
-| G2-12 | Remove Reactor imports from all 5 interfaces | 5 |
-| G2-13 | Remove `reactive()` implementations from all 5 impl classes | 5 |
-| G2-14 | Update all tests using `reactive()` to use `getExtension()` | Many |
-| G2-15 | Add classloader isolation test to verify no Reactor loading | 1 |
+// Must use reactive interface
+ReactiveStatefulRedisConnection<String, String> conn = client.connectReactive();
+conn.reactive().get("key").subscribe();  // Works
+```
 
