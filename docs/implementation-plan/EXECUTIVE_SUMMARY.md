@@ -94,13 +94,48 @@ For components like EventBus, use factory-based runtime selection:
 
 ---
 
-## Success Criteria
+## Testing Strategy
 
-- Lettuce starts and operates without Reactor on classpath (sync/async only)
-- No `NoClassDefFoundError` when Reactor absent
-- All existing tests pass with Reactor present
-- New no-Reactor test suite passes
-- Performance benchmarks show acceptable results for hot paths
+### Core Principle: No-Reactor by Default
+
+**The test suite runs WITHOUT Reactor on the classpath by default.**
+
+Tests that strictly require Reactor are tagged `@Tag("requires-reactor")` and run separately. This ensures the majority of the codebase (~77% of tests) works correctly without Reactor as a dependency.
+
+```
+┌────────────────────────────────────────┐     ┌────────────────────────────────────────┐
+│ DEFAULT: No-Reactor Profile            │     │ SEPARATE: Reactor-Only Profile         │
+├────────────────────────────────────────┤     ├────────────────────────────────────────┤
+│ mvn verify -Pno-reactor                │     │ mvn verify -Preactor-only              │
+│                                        │     │                                        │
+│ - Reactor excluded from classpath      │     │ - Reactor on classpath                 │
+│ - Runs ALL tests EXCEPT tagged ones    │     │ - Runs ONLY @Tag("requires-reactor")   │
+│ - Verifies isolation works             │     │ - Verifies reactive features work      │
+│ - ~77% of test files                   │     │ - ~23% of test files (~95 files)       │
+└────────────────────────────────────────┘     └────────────────────────────────────────┘
+                    │                                           │
+                    └─────────────┬─────────────────────────────┘
+                                  ▼
+                         BOTH MUST PASS
+```
+
+### Why No-Reactor First
+
+Running without Reactor by default catches "leaked" dependencies - if any sync/async test fails because it triggers Reactor class loading, that's a bug to fix in the production code.
+
+### Testing Goals
+
+| Goal | Verification |
+|------|--------------|
+| **Isolation** | Reactor classes do NOT load when using sync/async APIs only |
+| **No regression** | Existing behavior unchanged (with Reactor present) |
+| **Equivalence** | New non-Reactor implementations behave identically to Reactor ones |
+
+### Contract Tests (Optional)
+
+For components with dual implementations (Reactor and non-Reactor), contract tests ensure behavioral equivalence. An abstract base class defines expected behavior; both implementations must pass the same tests.
+
+See [TESTING_STRATEGY.md](TESTING_STRATEGY.md) for full details.
 
 ---
 

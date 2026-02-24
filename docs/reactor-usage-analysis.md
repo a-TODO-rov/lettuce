@@ -1,19 +1,26 @@
 # Reactor Usage Analysis in Lettuce
 
-This document catalogs all Reactor (Project Reactor) usage in the Lettuce codebase, organized by logical groups.
+This document catalogs Reactor (Project Reactor) usage in the Lettuce codebase, organized by logical groups. It serves as a reference inventory for the "Reactor Optional Dependency" initiative.
 
 ## Summary
 
-- **Total files using Reactor**: 72
-- **Files outside reactive API**: 48 (these need refactoring)
-- **Primary imports**:
-  - `Mono`: 55+ files (single async value)
-  - `Flux`: 37+ files (stream of values)
-  - `Tuple2/Tuples`: 10 files (pair values)
-  - `Context`: 3 files (reactive context propagation)
-  - `Sinks`: 2 files (programmatic signal emission)
-  - `FluxSink`: 2 files (Pub/Sub streaming)
-  - Other: 5 files (Schedulers, Hooks, Exceptions, etc.)
+Reactor types are used throughout Lettuce, both for the reactive API feature (legitimate usage) and in internal/public infrastructure (areas that need refactoring to make Reactor optional).
+
+**Primary Reactor imports:**
+- `Mono` - single async value (most common)
+- `Flux` - stream of values
+- `Tuple2/Tuples` - pair values
+- `Context` - reactive context propagation
+- `Sinks` - programmatic signal emission
+- `FluxSink` - Pub/Sub streaming
+- Other - Schedulers, Hooks, Exceptions, etc.
+
+**Goal:** Make Reactor optional for users who only need sync/async APIs.
+
+**Related documents:**
+- `docs/implementation-plan/EXECUTIVE_SUMMARY.md` - Solution overview
+- `docs/implementation-plan/RELEASE_ROADMAP.md` - Release strategy
+- `docs/implementation-plan/G1_REACTIVE_API.md` through `G8_*.md` - Implementation details
 
 ---
 
@@ -29,9 +36,11 @@ This document catalogs all Reactor (Project Reactor) usage in the Lettuce codeba
 
 ---
 
-## Group 1: Reactive API (Core Feature)
+## Group 1: Reactive API (G1)
 
-**Status**: ❌ **Cannot remove** - This IS the reactive API feature
+**Status**: **No changes required** - This IS the reactive API feature
+
+The reactive command interfaces and implementations that return `Mono<T>` and `Flux<T>`. This is the feature itself, not a "leak" to be refactored. The goal is to isolate G1 so it only loads when explicitly used.
 
 ### Interfaces (Public API)
 
@@ -74,11 +83,38 @@ This document catalogs all Reactor (Project Reactor) usage in the Lettuce codeba
 | `RedisClusterPubSubReactiveCommandsImpl` | `core/cluster/` | Flux |
 | `ReactiveExecutionsImpl` | `core/cluster/` | Flux, Mono |
 
+See `docs/implementation-plan/G1_REACTIVE_API.md` for details.
+
 ---
 
-## Group 2: Client & Connection Infrastructure
+## Group 2: Connection Interfaces (G2)
 
-**Status**: 🟡 **Internal** - Could potentially use CompletableFuture
+**Status**: **Critical blocker** - Public API with Reactor types in method signatures
+
+**Problem:** The `reactive()` method on connection interfaces forces Reactor class loading even when not used.
+
+**Solution:** Dual Interface Pattern - split into base interfaces (no Reactor) and reactive interfaces (has Reactor).
+
+### Known Affected Files
+
+| File | Location | Reactor Types | Usage |
+|------|----------|---------------|-------|
+| `StatefulRedisConnection` | `core/api/` | Mono (via reactive()) | Connection interface |
+| `StatefulRedisClusterConnection` | `core/cluster/api/` | Mono (via reactive()) | Cluster connection interface |
+| `StatefulRedisPubSubConnection` | `core/pubsub/api/` | Mono (via reactive()) | Pub/Sub connection interface |
+| `StatefulRedisSentinelConnection` | `core/sentinel/api/` | Mono (via reactive()) | Sentinel connection interface |
+| `StatefulRedisConnectionImpl` | `core/` | Mono | Connection implementation |
+| `StatefulRedisClusterConnectionImpl` | `core/cluster/` | Mono | Cluster connection implementation |
+
+See `docs/implementation-plan/G2_CONNECTION_INTERFACES.md` for details.
+
+---
+
+## Group 3: Client Infrastructure (G3)
+
+**Status**: **Internal** - Uses Mono/Tuple2 for async operations
+
+### Known Affected Files
 
 | File | Location | Reactor Types | Usage |
 |------|----------|---------------|-------|
@@ -87,68 +123,102 @@ This document catalogs all Reactor (Project Reactor) usage in the Lettuce codeba
 | `RedisClusterClient` | `core/cluster/` | Mono | Internal async connection setup |
 | `ConnectionBuilder` | `core/` | Mono | `Mono<SocketAddress>` socket address supplier |
 | `ConnectionWatchdog` | `core/protocol/` | Mono, Tuple2 | Reconnection with `Mono<SocketAddress>` |
-| `MaintenanceAwareConnectionWatchdog` | `core/protocol/` | Mono | Extends ConnectionWatchdog with `Mono<SocketAddress>` |
-| `ReconnectionHandler` | `core/protocol/` | Mono, Tuple2, Tuples | Reconnect logic with `Mono<SocketAddress>` |
-| `AbstractClusterNodeConnectionFactory` | `core/cluster/` | Mono | `Mono<SocketAddress>` for cluster node connections |
+| `MaintenanceAwareConnectionWatchdog` | `core/protocol/` | Mono | Extends ConnectionWatchdog |
+| `ReconnectionHandler` | `core/protocol/` | Mono, Tuple2, Tuples | Reconnect logic |
+| `AbstractClusterNodeConnectionFactory` | `core/cluster/` | Mono | Cluster node connections |
 | `RedisURI` | `core/` | Mono | Credential resolution (internal) |
 | `ClientOptions` | `core/` | Mono | Socket address supplier |
-| `StatefulRedisConnectionImpl` | `core/` | Mono | Close handling |
-| `StatefulRedisClusterConnectionImpl` | `core/cluster/` | Mono | Close handling |
 | `RedisPublisher` | `core/` | CoreSubscriber, Exceptions, Context | Reactive streams bridge |
 | `Operators` | `core/` | Exceptions, Hooks, Context, Queues | Reactive utilities |
 | `ScanStream` | `core/` | Flux, Mono | Scan iteration helper |
 | `ClusterScanSupport` | `core/cluster/` | Mono | Cluster scan helper |
 
 ### Notes
-- The `protocol/` package files (`ConnectionWatchdog`, `ReconnectionHandler`, etc.) use `Mono<SocketAddress>` for async address resolution
-- `Tuple2` is used to pair socket addresses with connection metadata
-- Pattern for replacement: `Mono<SocketAddress>` → `Supplier<CompletionStage<SocketAddress>>`
-- `Tuple2` → `Pair<T1, T2>` (new utility class needed)
+- Pattern for replacement: `Mono<SocketAddress>` to `Supplier<CompletionStage<SocketAddress>>`
+- `Tuple2` to `Pair<T1, T2>` (new utility class needed)
+
+See `docs/implementation-plan/G3_REDISCLIENT_CLUSTERLIENT.md` for details.
 
 ---
 
-## Group 3: Master-Replica Topology
+## Group 4: Master-Replica Topology (G4)
 
-**Status**: 🟡 **Internal** - Could potentially use CompletableFuture
+**Status**: **Internal** - Performance-critical hot path
 
-| File | Location | Reactor Types |
-|------|----------|---------------|
-| `MasterReplicaConnectionProvider` | `core/masterreplica/` | Flux, Mono |
-| `MasterReplicaTopologyRefresh` | `core/masterreplica/` | Mono |
-| `StaticMasterReplicaConnector` | `core/masterreplica/` | Mono |
-| `StaticMasterReplicaTopologyProvider` | `core/masterreplica/` | Flux, Mono |
-| `AutodiscoveryConnector` | `core/masterreplica/` | Mono, Tuple2, Tuples |
-| `SentinelConnector` | `core/masterreplica/` | Mono |
-| `SentinelTopologyProvider` | `core/masterreplica/` | Mono, Tuple2 |
-| `ReplicaTopologyProvider` | `core/masterreplica/` | Mono |
-| `Connections` | `core/masterreplica/` | Mono, Tuple2 |
-| `AsyncConnections` | `core/masterreplica/` | Mono, Tuples |
-| `Requests` | `core/masterreplica/` | Tuple2, Tuples |
-| `ResumeAfter` | `core/masterreplica/` | Mono |
-
----
-
-## Group 4: Credentials & Authentication
-
-**Status**: 🟡 **Needs refactoring** - Uses both `Mono` and `Flux`
+### Known Affected Files
 
 | File | Location | Reactor Types | Usage |
 |------|----------|---------------|-------|
-| `RedisCredentialsProvider` | `core/` | Flux, Mono | `resolveCredentials()` uses Mono, `credentials()` returns Flux |
-| `StaticCredentialsProvider` | `core/` | Mono | Implements `RedisCredentialsProvider` with `Mono.just()` |
-| `RedisAuthenticationHandler` | `core/` | Disposable, Flux | Subscribes to credential stream |
-| `TokenBasedRedisCredentialsProvider` | `authx/` | Flux, Mono, Sinks | Token-based auth with streaming |
+| `MasterReplicaConnectionProvider` | `core/masterreplica/` | Flux, Mono | Hot path for `ReadFrom` |
+| `MasterReplicaTopologyRefresh` | `core/masterreplica/` | Mono | Topology refresh |
+| `StaticMasterReplicaConnector` | `core/masterreplica/` | Mono | Static connector |
+| `StaticMasterReplicaTopologyProvider` | `core/masterreplica/` | Flux, Mono | Static topology |
+| `AutodiscoveryConnector` | `core/masterreplica/` | Mono, Tuple2, Tuples | Auto-discovery |
+| `SentinelConnector` | `core/masterreplica/` | Mono | Sentinel connector |
+| `SentinelTopologyProvider` | `core/masterreplica/` | Mono, Tuple2 | Sentinel topology |
+| `ReplicaTopologyProvider` | `core/masterreplica/` | Mono | Replica topology |
+| `Connections` | `core/masterreplica/` | Mono, Tuple2 | Connection helpers |
+| `AsyncConnections` | `core/masterreplica/` | Mono, Tuples | Async connection helpers |
+| `Requests` | `core/masterreplica/` | Tuple2, Tuples | Request helpers |
+| `ResumeAfter` | `core/masterreplica/` | Mono | Resume helper |
 
 ### Notes
-- `resolveCredentials()` returns `Mono<RedisCredentials>` - can be changed to `CompletionStage<RedisCredentials>`
-- `credentials()` returns `Flux<RedisCredentials>` - streams multiple credential updates over time (cannot use CompletableFuture)
-- For streaming credentials, need alternative like `subscribe(Consumer<RedisCredentials>)` pattern
+- `MasterReplicaConnectionProvider.getConnectionAsync()` is a hot path called on every read operation with `ReadFrom`
+- Performance benchmarking required before and after refactoring
+
+See `docs/implementation-plan/G4_MASTER_REPLICA.md` for details.
 
 ---
 
-## Group 5: Tracing
+## Group 5: Event Bus (G5)
 
-**Status**: 🟡 **Public interface** - Uses Mono for context retrieval
+**Status**: **Public interface** - Uses Flux for event streaming
+
+**Problem:** `EventBus.get()` returns `Flux<Event>`, forcing Reactor dependency.
+
+**Solution:** SPI Factory Pattern - add `subscribe(Consumer<Event>)` method, use factory for runtime implementation selection.
+
+### Known Affected Files
+
+| File | Location | Reactor Types | Usage |
+|------|----------|---------------|-------|
+| `EventBus` | `core/event/` | Flux | `get()` returns event stream |
+| `DefaultEventBus` | `core/event/` | Flux, Sinks, Scheduler | Event emission |
+
+See `docs/implementation-plan/G5_EVENTBUS.md` for details.
+
+---
+
+## Group 6: Credentials (G6)
+
+**Status**: **Public interface** - Uses both Mono and Flux
+
+**Problem:** `resolveCredentials()` returns Mono, `credentials()` returns Flux.
+
+**Solution:** Add `resolveCredentialsAsync()` returning `CompletionStage`, add `subscribeToCredentials(Consumer)` for streaming.
+
+### Known Affected Files
+
+| File | Location | Reactor Types | Usage |
+|------|----------|---------------|-------|
+| `RedisCredentialsProvider` | `core/` | Flux, Mono | `resolveCredentials()` Mono, `credentials()` Flux |
+| `StaticCredentialsProvider` | `core/` | Mono | Implements with `Mono.just()` |
+| `RedisAuthenticationHandler` | `core/` | Disposable, Flux | Subscribes to credential stream |
+| `TokenBasedRedisCredentialsProvider` | `authx/` | Flux, Mono, Sinks | Token-based auth with streaming |
+
+See `docs/implementation-plan/G6_CREDENTIALS.md` for details.
+
+---
+
+## Group 7: Tracing (G7)
+
+**Status**: **Public interface** - Uses Mono for context retrieval
+
+**Problem:** `getTraceContextLater()` returns Mono.
+
+**Solution:** Add `getTraceContextAsync()` returning `CompletionStage`.
+
+### Known Affected Files
 
 | File | Location | Reactor Types | Usage |
 |------|----------|---------------|-------|
@@ -157,62 +227,27 @@ This document catalogs all Reactor (Project Reactor) usage in the Lettuce codeba
 | `BraveTracing` | `core/tracing/` | Mono | Brave implementation |
 | `MicrometerTracing` | `core/tracing/` | Mono | Micrometer implementation |
 
----
-
-## Group 6: Event Bus
-
-**Status**: 🟡 **Public interface** - Uses Flux for event streaming
-
-| File | Location | Reactor Types | Usage |
-|------|----------|---------------|-------|
-| `EventBus` | `core/event/` | Flux | `get()` returns event stream |
-| `DefaultEventBus` | `core/event/` | Flux, Sinks, Scheduler | Event emission |
-
-### Notes
-- `EventBus.get()` returns `Flux<Event>` - this is a streaming use case
-- Events are emitted over time, so Flux is semantically correct
+See `docs/implementation-plan/G7_TRACING.md` for details.
 
 ---
 
-## Group 7: Dynamic Commands / Type Adapters
+## Group 8: Dynamic Resources (G8)
 
-**Status**: 🟡 **Supports reactive API**
+**Status**: **Internal** - Supports reactive API, scheduler integration
+
+**Problem:** Classes reference Reactor types without guards, causing class loading failures.
+
+**Solution:** Guard with `Class.forName()` checks before touching Reactor types.
+
+### Known Affected Files
 
 | File | Location | Reactor Types | Usage |
 |------|----------|---------------|-------|
 | `ReactiveTypes` | `core/dynamic/` | Flux, Mono | Type detection utilities |
 | `ReactiveTypeAdapters` | `core/dynamic/` | Flux, Mono | Convert between reactive types |
-
----
-
-## Group 8: Resources
-
-**Status**: 🟡 **Internal** - Scheduler integration
-
-| File | Location | Reactor Types | Usage |
-|------|----------|---------------|-------|
 | `DefaultClientResources` | `core/resource/` | Schedulers | Provides Reactor scheduler |
 
----
-
-## Refactoring Considerations
-
-### Can be refactored to CompletableFuture
-- Single-value async operations (currently using `Mono`)
-- Internal connection setup
-- Topology discovery (single result)
-- Tracing context retrieval
-
-### Cannot be refactored to CompletableFuture
-- Reactive command API (Flux/Mono are the feature)
-- Streaming credentials (`credentials()`)
-- Event bus (`Flux<Event>`)
-- Pub/Sub message streams
-
-### Trade-offs
-- Lettuce already depends on Reactor for its reactive API
-- Removing Reactor from internal code provides limited benefit
-- Public API changes require careful consideration of backward compatibility
+See `docs/implementation-plan/G8_DYNAMIC_RESOURCES.md` for details.
 
 ---
 
@@ -230,16 +265,15 @@ This document catalogs all Reactor (Project Reactor) usage in the Lettuce codeba
 
 ---
 
-## File Count by Group
+## Group Summary
 
-| Group | Files | Priority |
-|-------|-------|----------|
-| G1: Reactive API | 24+ | ❌ Cannot change (IS the feature) |
-| G2: Client & Connection | 16 | High - core infrastructure |
-| G3: Master-Replica | 12 | Medium |
-| G4: Credentials | 4 | High - public interface |
-| G5: Tracing | 4 | Medium - public interface |
-| G6: Event Bus | 2 | Medium - public interface |
-| G7: Dynamic Commands | 2 | Low - supports reactive API |
-| G8: Resources | 1 | Low |
-
+| Group | Type | Status | Release |
+|-------|------|--------|---------|
+| G1: Reactive API | Feature | Keep as-is | N/A |
+| G2: Connection Interfaces | Public API | Critical blocker | 7.x ASAP |
+| G3: Client Infrastructure | Internal | Refactor | 7.x Later |
+| G4: Master-Replica | Internal | Refactor + benchmark | 7.x Later |
+| G5: Event Bus | Public API | Add callback API | 7.x ASAP |
+| G6: Credentials | Public API | Add async API | 7.x ASAP |
+| G7: Tracing | Public API | Add async API | 7.x ASAP |
+| G8: Dynamic Resources | Internal | Guard loading | 7.x Later |

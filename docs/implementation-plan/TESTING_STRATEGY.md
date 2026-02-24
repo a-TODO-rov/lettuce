@@ -7,90 +7,218 @@
 
 ## Problem Statement
 
-The Reactor optional dependency refactoring requires verifying **two distinct scenarios**:
+The Reactor optional dependency refactoring requires verifying **three things**:
 
-1. **Without Reactor on classpath** - No `NoClassDefFoundError`, sync/async APIs work
-2. **With Reactor on classpath** - Reactive APIs work correctly, no regressions
-
-Currently, all tests run with Reactor on the classpath. There is no existing pattern for running tests without an optional dependency.
-
----
-
-## Current Test Infrastructure
-
-| Component | Details |
-|-----------|---------|
-| **Unit Tests** | `*UnitTests`, `*Tests` (excludes `*IntegrationTests`) - surefire plugin |
-| **Integration Tests** | `*IntegrationTests`, `*Test` - failsafe plugin, require Redis |
-| **Test Tags** | `UNIT_TEST`, `INTEGRATION_TEST`, `SCENARIO_TEST`, `ENTRA_ID`, `API_GENERATOR` |
-| **Test Extension** | `LettuceExtension` - JUnit 5 extension for resource injection |
-| **Reactive Testing** | `reactor-test` with `StepVerifier` for reactive verification |
-| **CI Matrix** | Runs against multiple Redis versions |
+1. **Isolation** - Reactor classes do NOT load when using sync/async APIs only
+2. **No regression** - Existing behavior unchanged (with Reactor present)
+3. **Equivalence** - New non-Reactor implementations behave identically to Reactor ones
 
 ---
 
-## Potentially Affected Test Areas
+## Core Approach: Reactor-Free by Default
 
-### EventBus Tests
-- Tests using `eventBus.get()` returning `Flux`
-- Tests using `StepVerifier` for event verification
+**The test suite should pass WITHOUT Reactor on the classpath by default.**
 
-### Credentials Tests
-- Tests using `resolveCredentials()` returning `Mono`
-- Tests for streaming credentials with `Flux`
-- Test helpers using `Sinks`
+Tests that strictly require Reactor are tagged `@Tag("requires-reactor")` and excluded from the default run. A separate profile runs only those tagged tests with Reactor present.
 
-### Tests NOT Requiring Changes
-- Connection tests (interfaces change, behavior unchanged)
-- Internal utility tests (`Pair.java` is internal)
-- Master-Replica tests (internal `Mono` to CF change)
-- Reactive command tests (testing reactive feature - should use Reactor)
+| Profile | Classpath | Tests Run | Purpose |
+|---------|-----------|-----------|---------|
+| **no-reactor** (default) | Reactor excluded | All EXCEPT `@Tag("requires-reactor")` | Verify isolation |
+| **reactor-only** | Reactor present | Only `@Tag("requires-reactor")` | Verify reactive features |
+
+This approach catches "leaked" Reactor dependencies - if an existing sync/async test fails because it triggers Reactor class loading, that's a bug to fix.
 
 ---
 
-## Testing Approach
+## Research Findings: Tests Requiring Reactor
 
-### 7.x (Deprecation Period)
+Analysis of the test suite identified ~95 files (~23% of ~413 test files) that depend on Reactor:
 
-#### Keep Existing Tests Running
+| Category | Files | Reason |
+|----------|-------|--------|
+| **Reactive command tests** (`/reactive/` folders) | ~35 | Test reactive API |
+| **Reactive infrastructure** (`*Reactive*` in name) | ~15 | Test reactive internals |
+| **Uses StepVerifier** | ~40 | Requires `reactor-test` |
+| **Uses `eventBus.get()`** | ~4 | Returns `Flux<Event>` |
+| **Uses `resolveCredentials()`** | ~8 | Returns `Mono<Credentials>` |
+| **Uses `.reactive()` incidentally** | ~20 | Calls reactive API in mixed tests |
+| **Reactive examples** | ~6 | Documentation examples |
 
-- No immediate test changes required
-- Deprecated methods (`EventBus.get()`, etc.) still work
-- `reactor-test` stays in test scope
-- All `StepVerifier`-based tests continue to pass
+Note: Categories overlap. The ~95 unique files require review and tagging.
 
-#### Add Parallel Tests for New APIs
+---
 
-For each breaking change (G5, G6), add **new tests** for callback/CompletionStage APIs alongside existing tests:
+## Testing Dimensions
+
+| Dimension | What it verifies | How to run |
+|-----------|------------------|------------|
+| **WITHOUT Reactor** | Sync/async works, no `NoClassDefFoundError` | `mvn verify -Pno-reactor` (default CI) |
+| **WITH Reactor** | Reactive features work correctly | `mvn verify -Preactor-only` |
+| **Isolation** | Reactor classes only load when explicitly used | Dedicated isolation tests |
+
+---
+
+## Existing Pattern: EpollProvider
+
+Lettuce already handles optional dependencies using `Class.forName()` guards. See `EpollProvider.java`:
 
 ```java
-// EXISTING (keep during 7.x, mark deprecated)
-@Test
-@Deprecated
-void publishToSubscriberFlux() {
-    StepVerifier.create(sut.get())
-        .then(() -> sut.publish(event))
-        .expectNext(event)
-        .thenCancel()
-        .verify();
+static {
+    boolean availability;
+    try {
+        Class.forName("io.netty.channel.epoll.Epoll");
+        availability = Epoll.isAvailable();
+    } catch (ClassNotFoundException e) {
+        availability = false;
+    }
+    EPOLL_AVAILABLE = availability;
 }
+```
 
-// NEW (add for 7.x)
-@Test
-void publishToSubscriberCallback() {
-    BlockingQueue<Event> received = new ArrayBlockingQueue<>(1);
-    try (Closeable sub = sut.subscribe(received::add)) {
-        sut.publish(event);
-        assertThat(received.poll(1, TimeUnit.SECONDS)).isEqualTo(event);
+This pattern should be followed for Reactor isolation in G8 (Dynamic Resources).
+
+---
+
+## Core Testing Patterns
+
+### Pattern 1: Contract Tests (Behavioral Equivalence)
+
+**The key pattern for regression-free refactoring.**
+
+Instead of writing separate tests for Reactor and non-Reactor implementations, write **one contract test** that both implementations must pass:
+
+```java
+/**
+ * Contract test for EventBus behavior.
+ * Both Reactor-based and callback-based implementations must pass.
+ */
+abstract class EventBusContractTest {
+
+    protected abstract EventBus createEventBus();
+    protected abstract void subscribe(EventBus bus, Consumer<Event> handler);
+    protected abstract void unsubscribe();
+
+    @Test
+    void shouldDeliverEventToSubscriber() throws Exception {
+        EventBus bus = createEventBus();
+        BlockingQueue<Event> received = new ArrayBlockingQueue<>(1);
+
+        subscribe(bus, received::add);
+        bus.publish(new ConnectedEvent("test"));
+
+        Event event = received.poll(1, TimeUnit.SECONDS);
+        assertThat(event).isInstanceOf(ConnectedEvent.class);
+        unsubscribe();
+    }
+
+    @Test
+    void shouldDeliverMultipleEvents() throws Exception {
+        // ... same contract, both impls must pass
     }
 }
 ```
 
-#### Create No-Reactor Maven Profile
+Then two concrete test classes:
 
-Add a new Maven profile to run tests **without Reactor on classpath**:
+```java
+// Runs WITH Reactor - tests the Flux-based API
+@Tag("requires-reactor")
+class ReactorEventBusContractTest extends EventBusContractTest {
+    private Disposable subscription;
+
+    @Override
+    protected EventBus createEventBus() {
+        return new DefaultEventBus(Schedulers.immediate());
+    }
+
+    @Override
+    protected void subscribe(EventBus bus, Consumer<Event> handler) {
+        subscription = bus.get().subscribe(handler::accept);
+    }
+
+    @Override
+    protected void unsubscribe() {
+        subscription.dispose();
+    }
+}
+
+// Runs WITHOUT Reactor - tests the new callback API
+class CallbackEventBusContractTest extends EventBusContractTest {
+    private Closeable subscription;
+
+    @Override
+    protected EventBus createEventBus() {
+        return new CallbackEventBus();
+    }
+
+    @Override
+    protected void subscribe(EventBus bus, Consumer<Event> handler) {
+        subscription = bus.subscribe(handler);
+    }
+
+    @Override
+    protected void unsubscribe() throws Exception {
+        subscription.close();
+    }
+}
+```
+
+**Why this matters:**
+- One source of truth for expected behavior
+- If implementations diverge, contract test fails
+- Freedom to refactor implementation without changing tests
+- Guarantees behavioral equivalence
+
+---
+
+### Pattern 2: Class Loading Isolation Tests
+
+Verify that Reactor classes are NOT loaded when using sync/async APIs only:
+
+```java
+// No tag - runs in default no-reactor profile
+class ReactorIsolationIntegrationTests {
+
+    @Test
+    void shouldNotLoadReactorClasses_whenUsingSyncApi() {
+        // Capture loaded classes before
+        Set<String> reactorClassesBefore = getLoadedReactorClasses();
+
+        // Use only sync API
+        RedisClient client = RedisClient.create("redis://localhost:6379");
+        StatefulRedisConnection<String, String> conn = client.connect();
+        conn.sync().set("key", "value");
+        conn.sync().get("key");
+        conn.close();
+        client.shutdown();
+
+        // Verify no new Reactor classes loaded
+        Set<String> reactorClassesAfter = getLoadedReactorClasses();
+        assertThat(reactorClassesAfter)
+            .as("No Reactor classes should be loaded when using sync API")
+            .isEqualTo(reactorClassesBefore);
+    }
+
+    private Set<String> getLoadedReactorClasses() {
+        // Use instrumentation or class loader inspection
+        // to find classes matching "reactor.*"
+    }
+}
+```
+
+**Why this matters:**
+- Passing tests don't guarantee isolation
+- A class could load without causing `NoClassDefFoundError`
+- This test explicitly verifies the isolation goal
+
+---
+
+### Pattern 3: Maven Profiles
+
+Two profiles for the two test scenarios:
 
 ```xml
+<!-- Profile 1: No Reactor (default for CI) -->
 <profile>
     <id>no-reactor</id>
     <build>
@@ -99,12 +227,27 @@ Add a new Maven profile to run tests **without Reactor on classpath**:
                 <artifactId>maven-failsafe-plugin</artifactId>
                 <configuration>
                     <classpathDependencyExcludes>
-                        <classpathDependencyExclude>io.projectreactor:reactor-core</classpathDependencyExclude>
-                        <classpathDependencyExclude>io.projectreactor:reactor-test</classpathDependencyExclude>
+                        <exclude>io.projectreactor:reactor-core</exclude>
+                        <exclude>io.projectreactor:reactor-test</exclude>
                     </classpathDependencyExcludes>
-                    <includes>
-                        <include>**/NoReactor*IntegrationTests.java</include>
-                    </includes>
+                    <!-- Run all tests EXCEPT those requiring Reactor -->
+                    <excludedGroups>requires-reactor</excludedGroups>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</profile>
+
+<!-- Profile 2: Reactor Only -->
+<profile>
+    <id>reactor-only</id>
+    <build>
+        <plugins>
+            <plugin>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <configuration>
+                    <!-- Run ONLY tests requiring Reactor -->
+                    <groups>requires-reactor</groups>
                 </configuration>
             </plugin>
         </plugins>
@@ -112,234 +255,159 @@ Add a new Maven profile to run tests **without Reactor on classpath**:
 </profile>
 ```
 
-#### Create No-Reactor Integration Tests
+Run with:
+- `mvn verify -Pno-reactor` - All tests except reactive (Reactor OFF)
+- `mvn verify -Preactor-only` - Only reactive tests (Reactor ON)
 
-Create dedicated tests that verify Lettuce works without Reactor:
+---
 
-```java
-@Tag(INTEGRATION_TEST)
-class NoReactorSyncAsyncIntegrationTests {
+## Test Organization
 
-    @Test
-    void shouldConnectWithSyncApi() {
-        RedisClient client = RedisClient.create("redis://localhost:6479");
-        StatefulRedisConnection<String, String> conn = client.connect();
+Existing reactor-specific tests need `@Tag("requires-reactor")`:
 
-        // Use ONLY sync API - no reactive()
-        assertThat(conn.sync().ping()).isEqualTo("PONG");
-        conn.close();
-        client.shutdown();
-    }
-
-    @Test
-    void shouldConnectWithAsyncApi() throws Exception {
-        RedisClient client = RedisClient.create("redis://localhost:6479");
-        StatefulRedisConnection<String, String> conn = client.connect();
-
-        // Use async API
-        String result = conn.async().ping().get(1, TimeUnit.SECONDS);
-        assertThat(result).isEqualTo("PONG");
-        conn.close();
-        client.shutdown();
-    }
-
-    @Test
-    void shouldSubscribeToEventsWithCallback() throws Exception {
-        RedisClient client = RedisClient.create("redis://localhost:6479");
-        BlockingQueue<Event> events = new ArrayBlockingQueue<>(10);
-
-        try (Closeable sub = client.getResources().eventBus().subscribe(events::add)) {
-            StatefulRedisConnection<String, String> conn = client.connect();
-            assertThat(events.poll(5, TimeUnit.SECONDS)).isNotNull();
-            conn.close();
-        }
-        client.shutdown();
-    }
-}
+```
+src/test/java/io/lettuce/core/
+├── commands/
+│   └── reactive/                           # All @Tag("requires-reactor")
+│       ├── StringReactiveCommandIntegrationTests.java
+│       └── ...
+├── event/
+│   ├── EventBusContractTest.java           # Abstract contract (no tag)
+│   ├── ReactorEventBusContractTest.java    # @Tag("requires-reactor")
+│   └── CallbackEventBusContractTest.java   # No tag - runs without Reactor
+├── credentials/
+│   ├── CredentialsProviderContractTest.java
+│   └── ...
+└── isolation/
+    └── ReactorIsolationIntegrationTests.java  # No tag - verifies isolation
 ```
 
 ---
+
+## CI Configuration
+
+```yaml
+jobs:
+  test-no-reactor:
+    runs-on: ubuntu-latest
+    steps:
+      - run: mvn verify -Pno-reactor  # All tests EXCEPT requires-reactor
+
+  test-reactor-only:
+    runs-on: ubuntu-latest
+    steps:
+      - run: mvn verify -Preactor-only  # Only requires-reactor tests
+
+  # Gate job
+  all-tests-passed:
+    needs: [test-no-reactor, test-reactor-only]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "All tests passed"
+```
+
+Both jobs must pass for CI to be green.
+
+---
+
+## Execution Commands
+
+```bash
+# Run tests without Reactor (most tests)
+mvn verify -Pno-reactor
+
+# Run reactor-specific tests only
+mvn verify -Preactor-only
+
+# Run both sequentially (local development)
+mvn verify -Pno-reactor && mvn verify -Preactor-only
+
+# Run specific contract test
+mvn test -Dtest=EventBusContractTest
+```
+
+---
+
+## Testing by Release Phase
+
+Testing requirements evolve across releases:
+
+### 7.x ASAP (Deprecation Release)
+
+| What changes | Testing requirement |
+|--------------|---------------------|
+| New APIs added (G2, G5, G6, G7) | Add contract tests for new APIs |
+| Old APIs deprecated | Keep existing tests running (no changes) |
+| Tag existing reactor tests | Add `@Tag("requires-reactor")` to ~95 files |
+| Maven profiles created | Add `no-reactor` and `reactor-only` profiles |
+
+**CI at this phase:**
+```
+┌──────────────────────┐     ┌──────────────────────┐
+│ mvn -Pno-reactor     │     │ mvn -Preactor-only   │
+│ (exclude requires-   │     │ (only requires-      │
+│  reactor tests)      │     │  reactor tests)      │
+│ Reactor OFF          │     │ Reactor ON           │
+└──────────────────────┘     └──────────────────────┘
+           ↓                            ↓
+      Must pass                    Must pass
+```
+
+### 7.x Later (Internal Refactoring)
+
+| What changes | Testing requirement |
+|--------------|---------------------|
+| Internal Mono to CF refactoring (G3, G4, G8) | Existing tests must still pass |
+| No public API changes | No new tests needed |
+| Performance-sensitive paths (G4) | Add benchmarks for hot paths |
+
+**Key:** If existing tests pass after internal refactoring, behavior is preserved.
 
 ### 8.0 (Breaking Release)
 
-#### Remove Deprecated API Tests
-
-- Delete tests using `EventBus.get()` (returns Flux)
-- Delete tests using `resolveCredentials()` (returns Mono)
-- Keep `StepVerifier` tests **only** for reactive command APIs
-
-#### Update CI Matrix
-
-Expand CI to run both with and without Reactor:
-
-```yaml
-# .github/workflows/integration.yml
-strategy:
-  matrix:
-    redis_version: ["8.6", "8.4", "8.2", "8.0", "7.4", "7.2"]
-    reactor_mode: ["with-reactor", "without-reactor"]
-
-steps:
-  - name: Run tests
-    run: |
-      if [ "${{ matrix.reactor_mode }}" == "without-reactor" ]; then
-        make test PROFILE=no-reactor
-      else
-        make test
-      fi
-```
+| What changes | Testing requirement |
+|--------------|---------------------|
+| Deprecated APIs removed | Delete deprecated API tests |
+| `reactive()` moved to separate interface | Update tests to use `connectReactive()` |
+| Reactor truly optional | Both CI profiles required to pass |
 
 ---
 
-## Test Execution Summary
+## Tagging Approach
 
-### Profiles
+**TDD-style tagging process:**
 
-| Profile | Reactor Present | Tests Run |
-|---------|-----------------|-----------|
-| `default` | Yes | All tests |
-| `no-reactor` | No | Only `NoReactor*` tests |
-| `doctests` | Yes | Example tests only |
+1. Run `mvn verify -Pno-reactor` (with Reactor excluded from classpath)
+2. Tests that fail with `NoClassDefFoundError` or `ClassNotFoundException` need tagging
+3. Add `@Tag("requires-reactor")` to those test classes
+4. Repeat until `mvn verify -Pno-reactor` passes
 
-### Commands
+**Files to tag (from research):**
 
-```bash
-# Run all tests (default - with Reactor)
-make test
-
-# Run no-reactor tests (verify optional dependency works)
-mvn -Pno-reactor -DskipITs=false verify
-
-# Run coverage
-make test-coverage
-```
+| Location | Pattern |
+|----------|---------|
+| `src/test/java/**/reactive/**` | All files in reactive folders |
+| `src/test/java/**/*Reactive*` | All files with Reactive in name |
+| Tests using `StepVerifier` | Requires `reactor-test` |
+| Tests using `eventBus.get()` | Returns `Flux` |
+| Tests using `resolveCredentials()` | Returns `Mono` |
 
 ---
 
-## New Test Areas
+## Constraints
 
-| Area | Purpose |
-|------|---------|
-| No-Reactor sync/async tests | Verify basic sync/async work without Reactor |
-| No-Reactor EventBus tests | Verify callback EventBus without Reactor |
-| No-Reactor credentials tests | Verify CF credentials without Reactor |
-| No-Reactor cluster tests | Verify cluster works without Reactor |
-| No-Reactor master-replica tests | Verify master-replica without Reactor |
-
----
-
-## Hotspots & Considerations
-
-### 1. StepVerifier Usage
-
-`StepVerifier` is from `reactor-test` - it cannot be used in no-reactor tests. Use blocking queues and `CountDownLatch` instead.
-
-### 2. Test Helper Classes
-
-Test helpers using `Sinks.Many` need parallel callback-based helpers.
-
-### 3. Integration Test Resource Injection
-
-`LettuceExtension` provides connection injection. Verify it works when reactive interfaces are not loaded.
-
-### 4. Example Files
-
-Example files in `src/test/java/io/redis/examples/reactive/` should continue to use Reactor - they demonstrate the reactive API.
+| Constraint | Reason |
+|------------|--------|
+| No `StepVerifier` in untagged tests | `reactor-test` won't be on classpath |
+| No `Flux`/`Mono` in contract test base class | Base class must compile without Reactor |
+| Use `BlockingQueue` for async assertions | Works without Reactor |
+| Use `@Tag("requires-reactor")` for Reactor tests | Excluded by no-reactor profile |
 
 ---
 
-## Verification Criteria
+## References
 
-### Before 7.x Release
-
-- All existing tests pass (with Reactor on classpath)
-- New callback/CF tests added and passing
-- `mvn -Pno-reactor verify` runs without `NoClassDefFoundError`
-- No-reactor tests verify sync/async APIs work
-- No-reactor tests verify EventBus callback works
-- No-reactor tests verify credentials CF works
-
-### Before 8.0 Release
-
-- Deprecated method tests removed
-- All `StepVerifier` usage is ONLY for reactive API commands
-- CI runs both `with-reactor` and `without-reactor` profiles
-- Performance benchmarks for hot paths (G4 connection selection)
-- Migration guide updated with test examples
-
----
-
-## Scope Summary
-
-### 7.x Scope
-
-| Scope | Description |
-|-------|-------------|
-| Maven profile | Create `no-reactor` profile |
-| No-reactor tests | Integration tests verifying core functionality without Reactor |
-| Callback tests | Tests for new callback/CF APIs |
-| Test helpers | Callback-based test helpers for streaming scenarios |
-| Infrastructure | Verify `LettuceExtension` works without reactive interfaces |
-
-### 8.0 Scope
-
-| Scope | Description |
-|-------|-------------|
-| Cleanup | Remove deprecated API tests |
-| CI | Update workflow for reactor matrix |
-| Helpers | Clean up test helpers using Reactor for non-reactive features |
-
----
-
-## Migration Examples
-
-### EventBus Test Migration
-
-**Before (using Flux):**
-```java
-@Test
-void publishToSubscriber() {
-    EventBus sut = new DefaultEventBus(Schedulers.immediate());
-    StepVerifier.create(sut.get())
-        .then(() -> sut.publish(event))
-        .expectNext(event)
-        .thenCancel()
-        .verify();
-}
-```
-
-**After (using callback):**
-```java
-@Test
-void publishToSubscriber() throws Exception {
-    EventBus sut = new CallbackEventBus();
-    BlockingQueue<Event> received = new ArrayBlockingQueue<>(1);
-
-    try (Closeable sub = sut.subscribe(received::add)) {
-        sut.publish(event);
-        assertThat(received.poll(1, TimeUnit.SECONDS)).isEqualTo(event);
-    }
-}
-```
-
-### Credentials Test Migration
-
-**Before (using Mono):**
-```java
-@Test
-void shouldResolveCredentials() {
-    StepVerifier.create(provider.resolveCredentials())
-        .expectNextMatches(creds -> "user".equals(creds.getUsername()))
-        .verifyComplete();
-}
-```
-
-**After (using CompletionStage):**
-```java
-@Test
-void shouldResolveCredentials() throws Exception {
-    CompletionStage<RedisCredentials> stage = provider.resolveCredentialsAsync();
-    RedisCredentials creds = stage.toCompletableFuture().get(1, TimeUnit.SECONDS);
-    assertThat(creds.getUsername()).isEqualTo("user");
-}
-```
+- [Release Roadmap](RELEASE_ROADMAP.md) - What ships in each release
+- [G2 - Connection Interfaces](G2_CONNECTION_INTERFACES.md) - Public API changes requiring contract tests
+- [G5 - EventBus](G5_EVENTBUS.md) - EventBus contract test example
+- [G6 - Credentials](G6_CREDENTIALS.md) - Credentials contract test example
