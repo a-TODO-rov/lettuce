@@ -183,6 +183,75 @@ RedisReactiveCommands<String, String> reactive = conn.reactive();
 
 ---
 
+## ReactorProvider Guard
+
+The dual interface approach prevents Reactor from loading when users don't want reactive. However, we also need to provide a **clear error message** when users try to use the reactive API without reactor-core on the classpath.
+
+Without a guard, users would see a cryptic `NoClassDefFoundError`. With a guard, they get an `IllegalStateException` with actionable instructions.
+
+### Implementation
+
+Lettuce already has `LettuceClassUtils.isPresent()` for checking class availability. `ReactorProvider` should use this existing utility rather than duplicating the pattern:
+
+```java
+// ReactorProvider.java (NEW)
+package io.lettuce.core.resource;
+
+import io.lettuce.core.internal.LettuceClassUtils;
+import io.lettuce.core.internal.LettuceAssert;
+
+public class ReactorProvider {
+
+    private static final boolean REACTOR_AVAILABLE =
+        LettuceClassUtils.isPresent("reactor.core.publisher.Mono");
+
+    public static boolean isAvailable() {
+        return REACTOR_AVAILABLE;
+    }
+
+    public static void checkForReactorLibrary() {
+        LettuceAssert.assertState(isAvailable(),
+            "Project Reactor (reactor-core) is not available. " +
+            "Add reactor-core to your classpath to use the reactive API.");
+    }
+}
+```
+
+This is similar to `EpollProvider` but simpler since we only need presence detection, not native library availability.
+
+### Where to Apply the Guard
+
+Apply the guard at all entry points to the reactive "island":
+
+```java
+// In RedisClient.connectReactive()
+public <K, V> ReactiveStatefulRedisConnection<K, V> connectReactive(RedisCodec<K, V> codec) {
+    ReactorProvider.checkForReactorLibrary();  // Guard BEFORE return type is resolved
+    return (ReactiveStatefulRedisConnection<K, V>) connect(codec);
+}
+
+// In StatefulRedisConnectionImpl.reactive() (deprecated path)
+@Override
+@Deprecated
+public RedisReactiveCommands<K, V> reactive() {
+    ReactorProvider.checkForReactorLibrary();  // Guard for legacy usage
+    return getReactiveCommands();
+}
+```
+
+### Why Both Dual Interface AND Guard?
+
+| Mechanism | What It Solves |
+|-----------|---------------|
+| **Dual Interface** | Prevents Reactor from loading when user stays on sync/async path |
+| **ReactorProvider Guard** | Provides clear error when user wants reactive but missing dependency |
+
+Both are needed for complete solution:
+- Dual interface = isolation (Quarkus can use Lettuce without Reactor)
+- Guard = good UX (clear error when someone forgets the dependency)
+
+---
+
 ## Hotspots & Considerations
 
 ### 1. `RedisChannelHandler` Type Parameter
@@ -238,6 +307,8 @@ The interfaces stay the same - files just move between modules.
 | Update implementations | Change `implements` to use reactive interface |
 | Deprecate base `reactive()` | Add `@Deprecated` with migration message |
 | Add `connectReactive()` | Typed connection methods in clients |
+| Create `ReactorProvider` | Guard class following `EpollProvider` pattern |
+| Add guards to entry points | Check Reactor availability before loading reactive types |
 | Documentation | Migration guide for reactive users |
 
 ### 8.0 (Breaking)

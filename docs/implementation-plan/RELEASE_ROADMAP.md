@@ -31,6 +31,7 @@ The refactoring is organized into **three releases**:
 - Update implementations to implement the reactive interface (which IS-A base interface)
 - Deprecate `reactive()` on base interfaces with migration message
 - Consider adding `connectReactive()` methods to clients
+- Create `ReactorProvider` guard class following `EpollProvider` pattern for clear error messages
 
 **Potentially affected areas:**
 - `StatefulRedisConnection` and related base interfaces
@@ -91,7 +92,7 @@ The refactoring is organized into **three releases**:
 
 | Group | New APIs | Deprecations |
 |-------|----------|--------------|
-| G2 | Reactive interfaces, `connectReactive()` | `reactive()` on base |
+| G2 | Reactive interfaces, `connectReactive()`, `ReactorProvider` | `reactive()` on base |
 | G5 | `subscribe()` | `get()` |
 | G6 | `resolveCredentialsAsync()`, `subscribeToCredentials()` | `resolveCredentials()`, `credentials()` |
 | G7 | `getTraceContextAsync()` | `getTraceContextLater()` |

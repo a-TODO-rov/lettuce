@@ -22,6 +22,8 @@ Split connection interfaces into base (no Reactor) and reactive (has Reactor):
 
 The reactive interface **extends** the base, so implementations remain compatible with existing code.
 
+A `ReactorProvider` guard class (following `EpollProvider` pattern) provides clear error messages when users attempt to use reactive APIs without reactor-core on the classpath.
+
 ### SPI Factory Pattern
 
 For components like EventBus, use factory-based runtime selection:

@@ -38,30 +38,29 @@ Type detection utilities that check if types are reactive (Flux/Mono). Used by d
 These files support the reactive API feature (G1). They should:
 - Remain in the codebase (required for reactive API)
 - Be loaded only when Reactor is present
-- Use `Class.forName()` checks before touching Reactor types
+- Guard against class loading when Reactor is absent
 
-**Pattern:**
+**Current implementation (already correct):**
+
+`ReactiveTypes` already uses `LettuceClassUtils.isPresent()` for Reactor detection:
+
 ```java
-public class ReactiveTypes {
-    private static final boolean REACTOR_PRESENT = isReactorPresent();
-
-    public static boolean isReactiveType(Class<?> type) {
-        if (!REACTOR_PRESENT) {
-            return false;
-        }
-        return isFlux(type) || isMono(type);
-    }
-
-    private static boolean isReactorPresent() {
-        try {
-            Class.forName("reactor.core.publisher.Mono");
-            return true;
-        } catch (ClassNotFoundException e) {
-            return false;
-        }
-    }
-}
+// ReactiveTypes.java (EXISTING - no changes needed)
+private static final boolean PROJECT_REACTOR_PRESENT =
+    LettuceClassUtils.isPresent("reactor.core.publisher.Mono");
 ```
+
+This is the shared utility that `ReactorProvider` (G2) should also use, avoiding duplication.
+
+**Relationship to ReactorProvider:**
+
+| Class | Purpose |
+|-------|---------|
+| `LettuceClassUtils.isPresent()` | General utility for checking class availability |
+| `ReactiveTypes.PROJECT_REACTOR_PRESENT` | Internal flag for dynamic command generation |
+| `ReactorProvider.isAvailable()` | Public API for reactive island guard (G2) |
+
+`ReactorProvider` adds the `checkForReactorLibrary()` guard method that throws a clear error message - something `ReactiveTypes` doesn't need since it silently degrades.
 
 ### Resources
 
