@@ -863,11 +863,11 @@ public class RedisClusterClient extends AbstractRedisClient {
      */
     @SuppressWarnings("unchecked")
     private <K, V, T extends StatefulRedisConnectionImpl<K, V>, S> ConnectionFuture<S> connectStatefulAsync(T connection,
-            DefaultEndpoint endpoint, RedisURI connectionSettings, Mono<SocketAddress> socketAddressSupplier,
+            DefaultEndpoint endpoint, RedisURI connectionSettings, Mono<SocketAddress> socketAddressMono,
             Supplier<CommandHandler> commandHandlerSupplier) {
 
         ConnectionBuilder connectionBuilder = createConnectionBuilder(connection, connection.getConnectionState(), endpoint,
-                connectionSettings, socketAddressSupplier, commandHandlerSupplier);
+                connectionSettings, socketAddressMono, commandHandlerSupplier);
 
         ConnectionFuture<RedisChannelHandler<K, V>> future = initializeChannelAsync(connectionBuilder);
 
@@ -875,7 +875,7 @@ public class RedisClusterClient extends AbstractRedisClient {
     }
 
     private <K, V> ConnectionBuilder createConnectionBuilder(RedisChannelHandler<K, V> connection, ConnectionState state,
-            DefaultEndpoint endpoint, RedisURI connectionSettings, Mono<SocketAddress> socketAddressSupplier,
+            DefaultEndpoint endpoint, RedisURI connectionSettings, Mono<SocketAddress> socketAddressMono,
             Supplier<CommandHandler> commandHandlerSupplier) {
 
         ConnectionBuilder connectionBuilder;
@@ -897,6 +897,13 @@ public class RedisClusterClient extends AbstractRedisClient {
         connectionBuilder.clientResources(getResources());
         connectionBuilder.endpoint(endpoint);
         connectionBuilder.commandHandler(commandHandlerSupplier);
+
+        // Convert Mono to Supplier<CompletionStage> for the connectionBuilder
+        Supplier<CompletionStage<SocketAddress>> socketAddressSupplier = () -> {
+            CompletableFuture<SocketAddress> future = new CompletableFuture<>();
+            socketAddressMono.subscribe(future::complete, future::completeExceptionally);
+            return future;
+        };
 
         connectionBuilder(socketAddressSupplier, connectionBuilder, connection.getConnectionEvents(), connectionSettings);
 

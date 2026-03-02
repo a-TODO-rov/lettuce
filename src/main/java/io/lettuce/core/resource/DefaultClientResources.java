@@ -55,7 +55,6 @@ import io.netty.util.concurrent.PromiseCombiner;
 import io.netty.util.internal.SystemPropertyUtil;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
-import reactor.core.scheduler.Schedulers;
 
 /**
  * Default instance of the client resources.
@@ -222,7 +221,7 @@ public class DefaultClientResources implements ClientResources {
         }
 
         if (builder.eventBus == null) {
-            eventBus = new DefaultEventBus(Schedulers.fromExecutorService(eventExecutorGroup, "lettuce-event-bus"));
+            eventBus = createEventBus(eventExecutorGroup);
         } else {
             eventBus = builder.eventBus;
         }
@@ -813,6 +812,29 @@ public class DefaultClientResources implements ClientResources {
     @Override
     public AddressResolverGroup<?> addressResolverGroup() {
         return addressResolverGroup;
+    }
+
+    /**
+     * Creates an EventBus. Uses Reactor-based DefaultEventBus if available, otherwise falls back to SimpleEventBus.
+     */
+    private static EventBus createEventBus(EventExecutorGroup eventExecutorGroup) {
+        if (isReactorAvailable()) {
+            return new DefaultEventBus(
+                    reactor.core.scheduler.Schedulers.fromExecutorService(eventExecutorGroup, "lettuce-event-bus"));
+        }
+        return new io.lettuce.core.event.SimpleEventBus();
+    }
+
+    /**
+     * Check if Reactor is available on the classpath.
+     */
+    private static boolean isReactorAvailable() {
+        try {
+            Class.forName("reactor.core.scheduler.Schedulers");
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
     }
 
 }

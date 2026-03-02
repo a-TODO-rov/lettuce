@@ -31,4 +31,3 @@ public interface ReactiveStatefulRedisMasterReplicaConnection<K, V>
     RedisReactiveCommands<K, V> reactive();
 
 }
-

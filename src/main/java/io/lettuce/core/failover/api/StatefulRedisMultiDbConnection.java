@@ -1,7 +1,7 @@
 package io.lettuce.core.failover.api;
 
 import io.lettuce.core.annotations.Experimental;
-import io.lettuce.core.api.StatefulRedisConnection;
+import io.lettuce.core.api.reactive.ReactiveStatefulRedisConnection;
 
 /**
  * Stateful multi-database Redis connection that supports failover between multiple endpoints. Each endpoint has its own circuit
@@ -14,6 +14,7 @@ import io.lettuce.core.api.StatefulRedisConnection;
  * @since 7.4
  */
 @Experimental
-public interface StatefulRedisMultiDbConnection<K, V> extends StatefulRedisConnection<K, V>, BaseRedisMultiDbConnection {
+public interface StatefulRedisMultiDbConnection<K, V>
+        extends ReactiveStatefulRedisConnection<K, V>, BaseRedisMultiDbConnection {
 
 }
