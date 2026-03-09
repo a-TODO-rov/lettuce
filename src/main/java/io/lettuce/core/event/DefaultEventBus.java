@@ -1,5 +1,9 @@
 package io.lettuce.core.event;
 
+import java.io.Closeable;
+import java.util.function.Consumer;
+
+import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Scheduler;
@@ -28,6 +32,12 @@ public class DefaultEventBus implements EventBus {
     @Override
     public Flux<Event> get() {
         return bus.asFlux().onBackpressureDrop().publishOn(scheduler);
+    }
+
+    @Override
+    public Closeable subscribe(Consumer<Event> listener) {
+        Disposable disposable = get().subscribe(listener::accept);
+        return disposable::dispose;
     }
 
     @Override

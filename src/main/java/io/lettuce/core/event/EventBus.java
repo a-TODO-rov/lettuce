@@ -1,5 +1,8 @@
 package io.lettuce.core.event;
 
+import java.io.Closeable;
+import java.util.function.Consumer;
+
 import reactor.core.publisher.Flux;
 
 /**
@@ -16,6 +19,15 @@ public interface EventBus {
      * @return the observable to obtain events.
      */
     Flux<Event> get();
+
+    /**
+     * Subscribe to events using a callback. Returns a {@link Closeable} to unsubscribe.
+     *
+     * @param listener the event consumer
+     * @return {@link Closeable} to cancel the subscription
+     * @since 7.5
+     */
+    Closeable subscribe(Consumer<Event> listener);
 
     /**
      * Publish a {@link Event} to the bus.

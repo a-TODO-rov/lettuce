@@ -588,7 +588,7 @@ public class RedisClient extends AbstractRedisClient {
             return failed;
         }
 
-        // Build a retry chain using CompletableFuture
+        // Build a retry chain using CompletableFuture (Java 8 compatible)
         CompletableFuture<StatefulRedisSentinelConnection<K, V>> connectionLoop = null;
 
         for (RedisURI uri : sentinels) {
@@ -596,12 +596,21 @@ public class RedisClient extends AbstractRedisClient {
                 connectionLoop = connectSentinelWithRetry(codec, uri, timeout, redisURI, exceptionCollector);
             } else {
                 final CompletableFuture<StatefulRedisSentinelConnection<K, V>> previous = connectionLoop;
-                connectionLoop = previous
-                        .exceptionallyCompose(t -> connectSentinelWithRetry(codec, uri, timeout, redisURI, exceptionCollector));
+                // Java 8 compatible: use handle() instead of exceptionallyCompose()
+                connectionLoop = previous.handle((result, t) -> {
+                    if (t == null) {
+                        return CompletableFuture.completedFuture(result);
+                    }
+                    return connectSentinelWithRetry(codec, uri, timeout, redisURI, exceptionCollector);
+                }).thenCompose(f -> f);
             }
         }
 
-        return connectionLoop.exceptionallyCompose(e -> {
+        // Java 8 compatible: use handle() instead of exceptionallyCompose()
+        return connectionLoop.handle((result, e) -> {
+            if (e == null) {
+                return CompletableFuture.completedFuture(result);
+            }
             Throwable cause = e instanceof CompletionException ? e.getCause() : e;
             RedisConnectionException ex = new RedisConnectionException(
                     "Cannot connect to a Redis Sentinel: " + redisURI.getSentinels(), cause);
@@ -615,14 +624,18 @@ public class RedisClient extends AbstractRedisClient {
             CompletableFuture<StatefulRedisSentinelConnection<K, V>> failed = new CompletableFuture<>();
             failed.completeExceptionally(ex);
             return failed;
-        });
+        }).thenCompose(f -> f);
     }
 
     private <K, V> CompletableFuture<StatefulRedisSentinelConnection<K, V>> connectSentinelWithRetry(RedisCodec<K, V> codec,
             RedisURI uri, Duration timeout, RedisURI redisURI, Queue<Throwable> exceptionCollector) {
 
+        // Java 8 compatible: use handle() instead of exceptionallyCompose()
         return doConnectSentinelAsync(codec, uri, timeout, new ConnectionMetadata(redisURI)).toCompletableFuture()
-                .exceptionallyCompose(e -> {
+                .handle((result, e) -> {
+                    if (e == null) {
+                        return CompletableFuture.completedFuture(result);
+                    }
                     Throwable cause = e instanceof CompletionException ? e.getCause() : e;
                     RedisConnectionException wrapped = new RedisConnectionException("Cannot connect Redis Sentinel at " + uri,
                             cause);
@@ -630,7 +643,7 @@ public class RedisClient extends AbstractRedisClient {
                     CompletableFuture<StatefulRedisSentinelConnection<K, V>> failed = new CompletableFuture<>();
                     failed.completeExceptionally(wrapped);
                     return failed;
-                });
+                }).thenCompose(f -> f);
     }
 
     private <K, V> ConnectionFuture<StatefulRedisSentinelConnection<K, V>> doConnectSentinelAsync(RedisCodec<K, V> codec,

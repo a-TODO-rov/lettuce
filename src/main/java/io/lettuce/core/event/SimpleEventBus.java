@@ -1,5 +1,10 @@
 package io.lettuce.core.event;
 
+import java.io.Closeable;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
+
 import io.lettuce.core.event.jfr.EventRecorder;
 
 /**
@@ -10,6 +15,8 @@ import io.lettuce.core.event.jfr.EventRecorder;
  */
 public class SimpleEventBus implements EventBus {
 
+    private final Set<Consumer<Event>> listeners = ConcurrentHashMap.newKeySet();
+
     private final EventRecorder recorder = EventRecorder.getInstance();
 
     @Override
@@ -19,8 +26,21 @@ public class SimpleEventBus implements EventBus {
     }
 
     @Override
+    public Closeable subscribe(Consumer<Event> listener) {
+        listeners.add(listener);
+        return () -> listeners.remove(listener);
+    }
+
+    @Override
     public void publish(Event event) {
         recorder.record(event);
+        for (Consumer<Event> listener : listeners) {
+            try {
+                listener.accept(event);
+            } catch (Exception e) {
+                // Log but don't propagate - isolate listener failures
+            }
+        }
     }
 
 }
