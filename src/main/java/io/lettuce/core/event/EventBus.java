@@ -3,22 +3,17 @@ package io.lettuce.core.event;
 import java.io.Closeable;
 import java.util.function.Consumer;
 
-import reactor.core.publisher.Flux;
-
 /**
  * Interface for an EventBus. Events can be published over the bus that are delivered to the subscribers.
+ * <p>
+ * This base interface does not depend on Reactor, making it safe to use when Reactor is not on the classpath. For reactive
+ * streaming support, use {@link ReactiveEventBus} which extends this interface.
  *
  * @author Mark Paluch
  * @since 3.4
+ * @see ReactiveEventBus
  */
 public interface EventBus {
-
-    /**
-     * Subscribe to the event bus and {@link Event}s. The {@link Flux} drops events on backpressure to avoid contention.
-     *
-     * @return the observable to obtain events.
-     */
-    Flux<Event> get();
 
     /**
      * Subscribe to events using a callback. Returns a {@link Closeable} to unsubscribe.

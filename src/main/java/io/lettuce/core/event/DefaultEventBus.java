@@ -10,13 +10,15 @@ import reactor.core.scheduler.Scheduler;
 import io.lettuce.core.event.jfr.EventRecorder;
 
 /**
- * Default implementation for an {@link EventBus}. Events are published using a {@link Scheduler} and events are recorded
- * through {@link EventRecorder#record(Event) EventRecorder}.
+ * Default implementation for an {@link EventBus} with reactive streaming support. Events are published using a
+ * {@link Scheduler} and events are recorded through {@link EventRecorder#record(Event) EventRecorder}.
+ * <p>
+ * This implementation requires Reactor to be on the classpath.
  *
  * @author Mark Paluch
  * @since 3.4
  */
-public class DefaultEventBus implements EventBus {
+public class DefaultEventBus implements ReactiveEventBus {
 
     private final Sinks.Many<Event> bus;
 

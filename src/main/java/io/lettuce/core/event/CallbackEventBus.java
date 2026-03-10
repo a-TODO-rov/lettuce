@@ -7,10 +7,12 @@ import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
 import io.lettuce.core.event.jfr.EventRecorder;
-import reactor.core.publisher.Flux;
 
 /**
  * Non-reactive EventBus implementation using callbacks. Thread-safe, lock-free multicast to subscribers.
+ * <p>
+ * This implementation does not depend on Reactor, making it safe to use in environments where Reactor is not available. Events
+ * are dispatched asynchronously using the provided {@link Executor}.
  *
  * @author Mark Paluch
  * @since 7.5
@@ -25,11 +27,6 @@ public class CallbackEventBus implements EventBus {
 
     public CallbackEventBus(Executor executor) {
         this.executor = executor;
-    }
-
-    @Override
-    public Flux<Event> get() {
-        throw new UnsupportedOperationException("Reactive event streaming requires Reactor. Use subscribe(Consumer) instead.");
     }
 
     @Override
