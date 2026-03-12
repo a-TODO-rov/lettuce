@@ -36,7 +36,6 @@ import java.util.function.Supplier;
 
 import io.lettuce.core.annotations.Experimental;
 import io.lettuce.core.api.StatefulRedisConnection;
-import io.lettuce.core.api.reactive.ReactiveStatefulRedisConnection;
 import io.lettuce.core.codec.RedisCodec;
 import io.lettuce.core.codec.StringCodec;
 import io.lettuce.core.internal.ExceptionFactory;
@@ -249,61 +248,6 @@ public class RedisClient extends AbstractRedisClient {
         assertNotNull(redisURI);
 
         return getConnection(connectStandaloneAsync(codec, redisURI, redisURI.getTimeout()));
-    }
-
-    /**
-     * Open a new connection to a Redis server that treats keys and values as UTF-8 strings and returns a typed
-     * {@link ReactiveStatefulRedisConnection} that provides access to the reactive API.
-     * <p>
-     * This is the recommended way to obtain a reactive connection as it provides a properly typed connection without requiring
-     * a cast.
-     *
-     * @return A new stateful Redis connection with reactive API access
-     * @since 7.0
-     */
-    public ReactiveStatefulRedisConnection<String, String> connectReactive() {
-        return connectReactive(newStringStringCodec());
-    }
-
-    /**
-     * Open a new connection to a Redis server using the supplied {@link RedisCodec codec} and returns a typed
-     * {@link ReactiveStatefulRedisConnection} that provides access to the reactive API.
-     *
-     * @param codec Use this codec to encode/decode keys and values, must not be {@code null}
-     * @param <K> Key type
-     * @param <V> Value type
-     * @return A new stateful Redis connection with reactive API access
-     * @since 7.0
-     */
-    public <K, V> ReactiveStatefulRedisConnection<K, V> connectReactive(RedisCodec<K, V> codec) {
-        return (ReactiveStatefulRedisConnection<K, V>) connect(codec);
-    }
-
-    /**
-     * Open a new connection to a Redis server using the supplied {@link RedisURI} and returns a typed
-     * {@link ReactiveStatefulRedisConnection} that provides access to the reactive API.
-     *
-     * @param redisURI the Redis server to connect to, must not be {@code null}
-     * @return A new stateful Redis connection with reactive API access
-     * @since 7.0
-     */
-    public ReactiveStatefulRedisConnection<String, String> connectReactive(RedisURI redisURI) {
-        return (ReactiveStatefulRedisConnection<String, String>) connect(redisURI);
-    }
-
-    /**
-     * Open a new connection to a Redis server using the supplied {@link RedisURI} and the supplied {@link RedisCodec codec} and
-     * returns a typed {@link ReactiveStatefulRedisConnection} that provides access to the reactive API.
-     *
-     * @param codec Use this codec to encode/decode keys and values, must not be {@code null}
-     * @param redisURI the Redis server to connect to, must not be {@code null}
-     * @param <K> Key type
-     * @param <V> Value type
-     * @return A new stateful Redis connection with reactive API access
-     * @since 7.0
-     */
-    public <K, V> ReactiveStatefulRedisConnection<K, V> connectReactive(RedisCodec<K, V> codec, RedisURI redisURI) {
-        return (ReactiveStatefulRedisConnection<K, V>) connect(codec, redisURI);
     }
 
     /**

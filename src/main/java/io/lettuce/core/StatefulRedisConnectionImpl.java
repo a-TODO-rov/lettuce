@@ -33,7 +33,6 @@ import java.util.stream.Collectors;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.api.async.RedisAsyncCommands;
 import io.lettuce.core.api.push.PushListener;
-import io.lettuce.core.api.reactive.ReactiveStatefulRedisConnection;
 import io.lettuce.core.api.reactive.RedisReactiveCommands;
 import io.lettuce.core.api.sync.RedisCommands;
 import io.lettuce.core.cluster.api.sync.RedisClusterCommands;
@@ -51,16 +50,13 @@ import io.lettuce.core.resource.ReactorProvider;
  * A {@link ConnectionWatchdog} monitors each connection and reconnects automatically until {@link #close} is called. All
  * pending commands will be (re)sent after successful reconnection.
  * <p>
- * This implementation supports the reactive API via {@link ReactiveStatefulRedisConnection}. The reactive API requires Project
- * Reactor (reactor-core) to be on the classpath.
+ * The reactive API requires Project Reactor (reactor-core) to be on the classpath.
  *
  * @param <K> Key type.
  * @param <V> Value type.
  * @author Mark Paluch
- * @see ReactiveStatefulRedisConnection
  */
-public class StatefulRedisConnectionImpl<K, V> extends RedisChannelHandler<K, V>
-        implements ReactiveStatefulRedisConnection<K, V> {
+public class StatefulRedisConnectionImpl<K, V> extends RedisChannelHandler<K, V> implements StatefulRedisConnection<K, V> {
 
     protected final RedisCodec<K, V> codec;
 

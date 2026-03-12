@@ -1,7 +1,7 @@
 package io.lettuce.core.masterreplica;
 
 import io.lettuce.core.ReadFrom;
-import io.lettuce.core.api.reactive.ReactiveStatefulRedisConnection;
+import io.lettuce.core.api.StatefulRedisConnection;
 
 /**
  * Redis Master-Replica connection. The connection allows replica reads by setting {@link ReadFrom}.
@@ -11,7 +11,7 @@ import io.lettuce.core.api.reactive.ReactiveStatefulRedisConnection;
  * @author Mark Paluch
  * @since 4.1
  */
-public interface StatefulRedisMasterReplicaConnection<K, V> extends ReactiveStatefulRedisConnection<K, V> {
+public interface StatefulRedisMasterReplicaConnection<K, V> extends StatefulRedisConnection<K, V> {
 
     /**
      * Set from which nodes data is read. The setting is used as default for read operations on this connection. See the

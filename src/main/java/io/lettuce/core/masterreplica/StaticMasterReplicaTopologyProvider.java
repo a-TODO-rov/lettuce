@@ -11,7 +11,6 @@ import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisConnectionException;
 import io.lettuce.core.RedisURI;
 import io.lettuce.core.api.StatefulRedisConnection;
-import io.lettuce.core.api.reactive.ReactiveStatefulRedisConnection;
 import io.lettuce.core.codec.StringCodec;
 import io.lettuce.core.internal.Exceptions;
 import io.lettuce.core.internal.LettuceAssert;
@@ -102,8 +101,8 @@ class StaticMasterReplicaTopologyProvider implements TopologyProvider {
     private static Mono<RedisNodeDescription> getNodeDescription(RedisURI uri,
             StatefulRedisConnection<String, String> connection) {
 
-        return ((ReactiveStatefulRedisConnection<String, String>) connection).reactive().role().collectList()
-                .map(RoleParser::parse).map(it -> new RedisMasterReplicaNode(uri.getHost(), uri.getPort(), uri, it.getRole()));
+        return connection.reactive().role().collectList().map(RoleParser::parse)
+                .map(it -> new RedisMasterReplicaNode(uri.getHost(), uri.getPort(), uri, it.getRole()));
     }
 
 }
