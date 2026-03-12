@@ -11,12 +11,6 @@ import io.lettuce.core.json.JsonParser;
 import static io.lettuce.core.ClientOptions.DEFAULT_JSON_PARSER;
 
 /**
- * Implementation of {@link StatefulRedisMasterReplicaConnection}.
- * <p>
- * This implementation extends {@link StatefulRedisConnectionImpl} to provide full sync/async/reactive API access.
- *
- * @param <K> Key type.
- * @param <V> Value type.
  * @author Mark Paluch
  */
 class StatefulRedisMasterReplicaConnectionImpl<K, V> extends StatefulRedisConnectionImpl<K, V>

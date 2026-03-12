@@ -7,16 +7,10 @@ import io.lettuce.core.api.sync.RedisCommands;
 import io.lettuce.core.protocol.ConnectionWatchdog;
 
 /**
- * A thread-safe connection to a Redis server. Multiple threads may share one {@link StatefulRedisConnection}.
- * <p>
+ * A thread-safe connection to a redis server. Multiple threads may share one {@link StatefulRedisConnection}.
+ *
  * A {@link ConnectionWatchdog} monitors each connection and reconnects automatically until {@link #close} is called. All
  * pending commands will be (re)sent after successful reconnection.
- * <p>
- * This interface provides access to synchronous ({@link #sync()}), asynchronous ({@link #async()}), and reactive
- * ({@link #reactive()}) command APIs.
- * <p>
- * The reactive API requires Project Reactor on the classpath. Calling {@link #reactive()} without Reactor will throw an
- * {@link IllegalStateException}. Users who only need synchronous or asynchronous APIs can use Lettuce without Reactor.
  *
  * @param <K> Key type.
  * @param <V> Value type.
@@ -26,6 +20,7 @@ import io.lettuce.core.protocol.ConnectionWatchdog;
 public interface StatefulRedisConnection<K, V> extends StatefulConnection<K, V> {
 
     /**
+     *
      * @return true, if the connection is within a transaction.
      */
     boolean isMulti();
@@ -46,11 +41,8 @@ public interface StatefulRedisConnection<K, V> extends StatefulConnection<K, V> 
 
     /**
      * Returns the {@link RedisReactiveCommands} API for the current connection. Does not create a new connection.
-     * <p>
-     * This method requires Project Reactor (reactor-core) to be on the classpath.
      *
      * @return the reactive API for the underlying connection.
-     * @throws IllegalStateException if Project Reactor is not available on the classpath.
      */
     RedisReactiveCommands<K, V> reactive();
 

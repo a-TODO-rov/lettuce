@@ -257,7 +257,9 @@ public class RedisCommandFactory {
 
             if (connection instanceof StatefulRedisConnection) {
                 reactive = ((StatefulRedisConnection) connection).reactive();
-            } else if (connection instanceof StatefulRedisClusterConnection) {
+            }
+
+            if (connection instanceof StatefulRedisClusterConnection) {
                 reactive = ((StatefulRedisClusterConnection) connection).reactive();
             }
 

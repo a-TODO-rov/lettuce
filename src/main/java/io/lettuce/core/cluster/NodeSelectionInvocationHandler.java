@@ -169,8 +169,7 @@ class NodeSelectionInvocationHandler extends AbstractInvocationHandler {
             argsToUse[1] = ((Supplier) args[1]).get();
         }
 
-        Object target = executionModel == ExecutionModel.REACTIVE ? it.reactive() : it.async();
-        return targetMethod.invoke(target, argsToUse);
+        return targetMethod.invoke(executionModel == ExecutionModel.REACTIVE ? it.reactive() : it.async(), argsToUse);
     }
 
     @SuppressWarnings({ "unchecked", "rawtypes" })

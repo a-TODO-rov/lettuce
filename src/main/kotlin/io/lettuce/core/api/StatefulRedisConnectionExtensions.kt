@@ -5,9 +5,7 @@ import io.lettuce.core.api.coroutines.RedisCoroutinesCommands
 import io.lettuce.core.api.coroutines.RedisCoroutinesCommandsImpl
 
 /**
- * Extension for [StatefulRedisConnection] to create [RedisCoroutinesCommands].
- *
- * Note: This extension requires Project Reactor on the classpath as it wraps the reactive API.
+ * Extension for [StatefulRedisConnection] to create [RedisCoroutinesCommands]
  *
  * @author Mikhael Sokolov
  * @author Mark Paluch
