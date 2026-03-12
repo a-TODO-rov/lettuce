@@ -815,26 +815,16 @@ public class DefaultClientResources implements ClientResources {
     }
 
     /**
-     * Creates an EventBus. Uses Reactor-based DefaultEventBus if available, otherwise falls back to SimpleEventBus.
+     * Creates an EventBus. If Reactor is available, creates a DefaultEventBus with ReactorEventBus support. Otherwise, creates
+     * a DefaultEventBus without reactive support.
      */
     private static EventBus createEventBus(EventExecutorGroup eventExecutorGroup) {
-        if (isReactorAvailable()) {
-            return new DefaultEventBus(
+        if (ReactorProvider.isAvailable()) {
+            io.lettuce.core.event.ReactorEventBus reactorEventBus = new io.lettuce.core.event.ReactorEventBus(
                     reactor.core.scheduler.Schedulers.fromExecutorService(eventExecutorGroup, "lettuce-event-bus"));
+            return new DefaultEventBus(reactorEventBus);
         }
-        return new io.lettuce.core.event.SimpleEventBus();
-    }
-
-    /**
-     * Check if Reactor is available on the classpath.
-     */
-    private static boolean isReactorAvailable() {
-        try {
-            Class.forName("reactor.core.scheduler.Schedulers");
-            return true;
-        } catch (ClassNotFoundException e) {
-            return false;
-        }
+        return new DefaultEventBus();
     }
 
 }
