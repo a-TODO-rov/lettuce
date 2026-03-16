@@ -10,25 +10,27 @@ Lettuce currently **requires Project Reactor** on the classpath, even for users 
 
 ## Solution Approach
 
-### Dual Interface Pattern
+### Lazy Loading Pattern
 
-Split connection interfaces into base (no Reactor) and reactive (has Reactor):
+Keep `reactive()` in the base interface but use **lazy initialization** combined with **guard checks** to prevent Reactor class loading until actually needed:
 
-| Layer | Contains | Reactor Imports |
-|-------|----------|-----------------|
-| Base Interface | `sync()`, `async()` | No |
-| Reactive Interface | `reactive()` | Yes |
-| Implementation | All methods | Yes (isolated) |
+| Component | Strategy | Why It Works |
+|-----------|----------|--------------|
+| Connection Interfaces | `reactive()` in base interface + lazy field init | JVM only loads return type when method actually returns a value |
+| EventBus | Composition pattern with null check | Assigning `null` doesn't trigger class loading |
+| ReactorProvider | Guard check before reactive code | Throws before Reactor types are resolved |
 
-The reactive interface **extends** the base, so implementations remain compatible with existing code.
+This approach exploits JVM classloading behavior: method signatures are stored as string constants and only resolved when the method successfully returns.
 
-A `ReactorProvider` guard class (following `EpollProvider` pattern) provides clear error messages when users attempt to use reactive APIs without reactor-core on the classpath.
+### JVM Classloading Behavior (Key Insight)
 
-### SPI Factory Pattern
-
-For components like EventBus, use factory-based runtime selection:
-- Detect Reactor presence via `Class.forName()`
-- Return appropriate implementation (callback-based or Reactor-based)
+| Operation | Triggers Class Loading? |
+|-----------|------------------------|
+| `field = null` | **NO** |
+| `field = new SomeClass()` | **YES** |
+| `field = someMethod()` | **YES** (return type resolved) |
+| Method signature in interface | **NO** (just metadata) |
+| Method actually returns a value | **YES** (return type verified) |
 
 ### Standard Java Replacements
 
@@ -36,17 +38,26 @@ For components like EventBus, use factory-based runtime selection:
 |--------------|-------------|
 | `Mono<T>` | `CompletionStage<T>` |
 | `Flux<T>` (streaming) | `Closeable subscribe(Consumer<T>)` |
-| `Tuple2<A,B>` | `Pair<A,B>` (new utility) |
 
 ---
 
 ## Key Decisions
 
-1. **Dual Interface over single interface with optional method** - Cleaner API, compile-time safety
-2. **SPI Factory for EventBus** - Runtime flexibility, optimal implementation per environment
+1. **Lazy Loading over Dual Interface** - Simpler API, no interface proliferation, leverages JVM behavior
+2. **Composition for EventBus** - `DefaultEventBus` wraps optional `ReactorEventBus`
 3. **CompletionStage for single values** - Standard Java, no new dependencies
 4. **Callback pattern for streams** - Simple, Reactor-free streaming capability
-5. **Deprecate-then-remove strategy** - Non-breaking 7.x, breaking 8.0, migration time for users
+5. **Non-breaking approach** - Existing code continues to work unchanged
+
+### GraalVM Native Image Caveat
+
+The lazy loading strategy works on **HotSpot JVM** but has limitations on **GraalVM Native Image**:
+- Native Image performs static analysis at BUILD time
+- All reachable code paths are analyzed, regardless of runtime execution
+- Reactor classes must be available at build time if referenced in code
+- Solution: Use conditional reachability metadata (`typeReached` conditions)
+
+This is a consideration for frameworks like Quarkus that use GraalVM Native Image.
 
 ---
 
@@ -54,9 +65,8 @@ For components like EventBus, use factory-based runtime selection:
 
 | Release | Type | Content |
 |---------|------|---------|
-| **7.x ASAP** | Non-breaking | Add new APIs, deprecate old Reactor-based methods |
-| **7.x Later** | Non-breaking | Internal refactoring (Mono to CF), no user impact |
-| **8.0** | Breaking | Remove deprecated APIs, clean Reactor imports |
+| **7.x** | Non-breaking | Lazy loading + guards, backward compatible |
+| **Future** | Optional | Consider separate `lettuce-reactive` module |
 
 ---
 
@@ -64,10 +74,10 @@ For components like EventBus, use factory-based runtime selection:
 
 | Group | Area | Change Type | User Impact |
 |-------|------|-------------|-------------|
-| G2 | Connection Interfaces | Public API | Use `connectReactive()` for reactive |
+| G2 | Connection Interfaces | Internal | None - `reactive()` still available |
 | G3 | Client Infrastructure | Internal | None |
-| G4 | Master-Replica | Internal | None (perf benchmarking required) |
-| G5 | EventBus | Public API | Use `subscribe(Consumer)` |
+| G4 | Master-Replica | Internal | None |
+| G5 | EventBus | Public API | Use `subscribe(Consumer)` for Reactor-free |
 | G6 | Credentials | Public API | Use `resolveCredentialsAsync()` |
 | G7 | Tracing | Public API | Use `getTraceContextAsync()` |
 | G8 | Dynamic Resources | Internal | None |
@@ -78,11 +88,10 @@ For components like EventBus, use factory-based runtime selection:
 
 | User Type | Action Required |
 |-----------|-----------------|
-| Sync/Async only | None in 7.x. In 8.0: can remove Reactor dependency |
-| Reactive users | Update to `connectReactive()`, use reactive interface types |
-| Custom CredentialsProvider | Implement new async methods alongside existing |
-| Custom EventBus consumers | Migrate from `get().subscribe()` to `subscribe(Consumer)` |
-| Custom Tracing | Implement new async method |
+| Sync/Async only (standalone) | None - can now exclude Reactor from classpath |
+| Sync/Async only (cluster) | Reactor still required (internal Mono usage) |
+| Reactive users | None - API unchanged |
+| Custom EventBus consumers | Use `subscribe(Consumer)` or `reactive().get()` |
 
 ---
 
@@ -90,54 +99,9 @@ For components like EventBus, use factory-based runtime selection:
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|------------|--------|------------|
-| Performance regression in hot paths (G4) | Medium | High | Benchmark before/after, dual impl option |
-| User migration friction | Low | Medium | Long deprecation period, clear guides |
-| Custom implementation breakage | Low | Medium | Deprecation warnings provide notice |
-
----
-
-## Testing Strategy
-
-### Core Principle: No-Reactor by Default
-
-**The test suite runs WITHOUT Reactor on the classpath by default.**
-
-Tests that strictly require Reactor are tagged `@Tag("requires-reactor")` and run separately. This ensures the majority of the codebase (~77% of tests) works correctly without Reactor as a dependency.
-
-```
-┌────────────────────────────────────────┐     ┌────────────────────────────────────────┐
-│ DEFAULT: No-Reactor Profile            │     │ SEPARATE: Reactor-Only Profile         │
-├────────────────────────────────────────┤     ├────────────────────────────────────────┤
-│ mvn verify -Pno-reactor                │     │ mvn verify -Preactor-only              │
-│                                        │     │                                        │
-│ - Reactor excluded from classpath      │     │ - Reactor on classpath                 │
-│ - Runs ALL tests EXCEPT tagged ones    │     │ - Runs ONLY @Tag("requires-reactor")   │
-│ - Verifies isolation works             │     │ - Verifies reactive features work      │
-│ - ~77% of test files                   │     │ - ~23% of test files (~95 files)       │
-└────────────────────────────────────────┘     └────────────────────────────────────────┘
-                    │                                           │
-                    └─────────────┬─────────────────────────────┘
-                                  ▼
-                         BOTH MUST PASS
-```
-
-### Why No-Reactor First
-
-Running without Reactor by default catches "leaked" dependencies - if any sync/async test fails because it triggers Reactor class loading, that's a bug to fix in the production code.
-
-### Testing Goals
-
-| Goal | Verification |
-|------|--------------|
-| **Isolation** | Reactor classes do NOT load when using sync/async APIs only |
-| **No regression** | Existing behavior unchanged (with Reactor present) |
-| **Equivalence** | New non-Reactor implementations behave identically to Reactor ones |
-
-### Contract Tests (Optional)
-
-For components with dual implementations (Reactor and non-Reactor), contract tests ensure behavioral equivalence. An abstract base class defines expected behavior; both implementations must pass the same tests.
-
-See [TESTING_STRATEGY.md](TESTING_STRATEGY.md) for full details.
+| GraalVM Native Image incompatibility | High | Medium | Document reachability metadata requirements |
+| Cluster client still requires Reactor | Known | Low | Document limitation, future work |
+| Lazy init thread safety | Low | High | Double-checked locking with volatile |
 
 ---
 

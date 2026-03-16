@@ -1,6 +1,6 @@
 # G5 - EventBus Implementation Plan
 
-**Status:** Critical - Dual implementation required (SPI)
+**Status:** Implemented
 **Dependencies:** G2 (Connection Interfaces)
 **Blocks:** G8 (ClientResources)
 
@@ -8,7 +8,7 @@
 
 ## Problem Statement
 
-The `EventBus` interface has Reactor types in its **public API signature**:
+The `EventBus` interface had Reactor types in its **public API signature**:
 
 ```java
 public interface EventBus {
@@ -17,125 +17,173 @@ public interface EventBus {
 }
 ```
 
-**This is a performance-critical component** - events are published on every connection/command.
+---
+
+## Solution: Composition Pattern
+
+Instead of SPI factory selection, we use **composition**:
+
+1. `DefaultEventBus` - Reactor-free, callback-based implementation
+2. `ReactorEventBus` - Reactor-based implementation (uses `Sinks`, `Flux`)
+3. `DefaultEventBus` optionally **wraps** `ReactorEventBus` when Reactor is available
+
+This leverages the same JVM classloading insight from G2: assigning `null` to a field doesn't trigger class loading of the field's type.
 
 ---
 
-## Potentially Affected Areas
+## Implementation
 
-### Core EventBus
-- `EventBus` interface - Public interface with `Flux` return type
-- `DefaultEventBus` - Uses `Flux`, `Sinks`, `Scheduler` (optimized Reactor primitives)
-
-### New Components to Create
-- `CallbackEventBus` - Reactor-free implementation using callbacks
-- `EventBusFactory` - SPI loader for implementation selection
-- `EventBusReactiveAdapter` - Flux adapter in reactive island
-
-### Integration Points
-- `DefaultClientResources` - Creates EventBus instance
-
----
-
-## Implementation Approach
-
-### Dual Implementation via SPI Pattern
-
-1. **Modify `EventBus` interface** - Add `subscribe(Consumer<Event>)`, deprecate `get()`
-2. **Create `CallbackEventBus`** - Reactor-free implementation using callbacks
-3. **Rename `DefaultEventBus` to `ReactorEventBus`** - Keep for Reactor users
-4. **Create `EventBusFactory`** - SPI loader that selects implementation based on Reactor presence
-5. **Create `EventBusReactiveAdapter`** - In reactive island, converts callback-based to Flux
-
-### New Interface (7.x deprecation period)
+### EventBus Interface (Updated)
 
 ```java
 public interface EventBus {
-    @Deprecated  // Will be removed in 8.0
-    Flux<Event> get();
-
-    Closeable subscribe(Consumer<Event> listener);  // New non-reactive method
+    // Reactor-free callback subscription
+    Closeable subscribe(Consumer<Event> listener);
 
     void publish(Event event);
+
+    // Access to reactive API - throws if Reactor not available
+    ReactiveEventBus reactive();
+}
+```
+
+### ReactiveEventBus Interface (New)
+
+```java
+public interface ReactiveEventBus {
+    Flux<Event> get();
+    void publish(Event event);
+}
+```
+
+### DefaultEventBus (Reactor-Free)
+
+```java
+public class DefaultEventBus implements EventBus {
+    private final Set<Consumer<Event>> listeners = ConcurrentHashMap.newKeySet();
+    private final ReactorEventBus reactorEventBus;  // Can be null
+
+    // Reactor-free constructor
+    public DefaultEventBus() {
+        this.reactorEventBus = null;  // NO class loading triggered!
+    }
+
+    // With Reactor support
+    public DefaultEventBus(ReactorEventBus reactorEventBus) {
+        this.reactorEventBus = reactorEventBus;
+    }
+
+    @Override
+    public Closeable subscribe(Consumer<Event> listener) {
+        listeners.add(listener);
+        return () -> listeners.remove(listener);
+    }
+
+    @Override
+    public void publish(Event event) {
+        // Dispatch to callback listeners
+        for (Consumer<Event> listener : listeners) {
+            listener.accept(event);
+        }
+        // Also publish to reactive bus if available
+        if (reactorEventBus != null) {
+            reactorEventBus.publish(event);
+        }
+    }
+
+    @Override
+    public ReactiveEventBus reactive() {
+        if (reactorEventBus == null) {
+            throw new ReactorNotAvailableException(
+                "Reactive EventBus not available. Add reactor-core to your classpath.");
+        }
+        return reactorEventBus;
+    }
+}
+```
+
+### Why This Works (JVM Classloading)
+
+```java
+private final ReactorEventBus reactorEventBus;
+
+public DefaultEventBus() {
+    this.reactorEventBus = null;  // Just assigns null - NO class loading!
+}
+```
+
+| Operation | Triggers ReactorEventBus Loading? |
+|-----------|----------------------------------|
+| `this.reactorEventBus = null` | **NO** |
+| `this.reactorEventBus = new ReactorEventBus()` | **YES** |
+| `if (reactorEventBus != null)` | **NO** - null check doesn't load type |
+| `reactorEventBus.publish(event)` | **YES** - but only reached if non-null |
+
+---
+
+## ClientResources Integration
+
+`DefaultClientResources` creates the appropriate EventBus:
+
+```java
+// In DefaultClientResources.Builder
+public EventBus createEventBus() {
+    if (ReactorProvider.isAvailable()) {
+        return new DefaultEventBus(new ReactorEventBus(...));
+    } else {
+        return new DefaultEventBus();  // Reactor-free
+    }
 }
 ```
 
 ---
 
-## Breaking vs Non-Breaking Changes
+## Affected Files
 
-### Non-Breaking (7.x)
-- Add `subscribe(Consumer<Event>)` method to `EventBus`
-- Add `@Deprecated` to `get()` method
-- Create new `CallbackEventBus` implementation
-- Create `EventBusFactory` for SPI selection
+### Modified
+- `EventBus` interface - Added `subscribe()` and `reactive()` methods
+- `DefaultClientResources` - Conditional EventBus creation
 
-### Breaking (8.0)
-- Remove `get()` method from `EventBus`
-- Remove `Flux` import from `EventBus.java`
+### Created
+- `ReactiveEventBus` - Interface for reactive operations
+- `ReactorEventBus` - Reactor-based implementation
+- `ReactorNotAvailableException` - Clear error for missing Reactor
 
----
-
-## Hotspots & Considerations
-
-### 1. Performance-Critical Code
-
-`DefaultEventBus` uses highly optimized Reactor primitives:
-- `Sinks.Many.multicast().directBestEffort()` - Lock-free multicast
-- Busy-loop `tryEmitNext()` - Optimized for contention
-
-**Action:** Benchmark callback implementation vs Reactor implementation.
-
-### 2. Users Consuming Events via Flux
-
-Users currently using `eventBus.get().subscribe(...)` need migration path.
-
-**Solution:** Provide `EventBusReactiveAdapter.toFlux(eventBus)` in reactive island.
-
-### 3. ClientResources Integration
-
-`DefaultClientResources` creates `DefaultEventBus`. Needs update to use `EventBusFactory`.
+### Renamed
+- ~~`DefaultEventBus`~~ kept as-is, but now wraps optional `ReactorEventBus`
 
 ---
 
-## Scope Summary
+## User Experience
 
-### 7.x (Deprecation)
-
-| Scope | Description |
-|-------|-------------|
-| Interface update | Add `subscribe()`, deprecate `get()` |
-| Callback implementation | Create Reactor-free `CallbackEventBus` |
-| Factory | Create SPI-based `EventBusFactory` |
-| Adapter | Create `EventBusReactiveAdapter` for Flux users |
-| Integration | Update `DefaultClientResources` |
-| Verification | Benchmark callback vs Reactor performance |
-
-### 8.0 (Breaking)
-
-| Scope | Description |
-|-------|-------------|
-| Remove deprecated | Remove `get()` from interface |
-| Remove imports | Remove `Flux` import from `EventBus.java` |
-| Update usages | Update all code using `eventBus.get()` |
-
----
-
-## Migration Guide
-
-**Before (7.x - deprecated):**
+### Callback-based (works without Reactor)
 ```java
-eventBus.get().subscribe(event -> handle(event));
-```
-
-**After (7.x+ - recommended):**
-```java
-Closeable subscription = eventBus.subscribe(event -> handle(event));
+Closeable subscription = eventBus.subscribe(event -> {
+    System.out.println("Event: " + event);
+});
 // Later: subscription.close();
 ```
 
-**For Flux users (7.x+):**
+### Reactive (requires Reactor)
 ```java
-Flux<Event> events = EventBusReactiveAdapter.toFlux(eventBus);
+eventBus.reactive().get()
+    .filter(event -> event instanceof ConnectionEvent)
+    .subscribe(event -> handle(event));
 ```
 
+### Without Reactor - clear error
+```java
+eventBus.reactive();  // Throws ReactorNotAvailableException
+// "Reactive EventBus not available. Add reactor-core to your classpath."
+```
+
+---
+
+## Summary
+
+| Approach | Complexity | Why Chosen |
+|----------|------------|------------|
+| ~~SPI Factory~~ | Higher | Requires service loader, more classes |
+| **Composition** | Lower | Simple null check, leverages JVM behavior |
+
+The composition pattern is simpler and leverages the same JVM classloading insight used in G2: `field = null` doesn't trigger class loading.
