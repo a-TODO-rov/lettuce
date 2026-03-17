@@ -1,0 +1,323 @@
+[
+{
+  "name":"io.lettuce.core.AbstractRedisAsyncCommands",
+  "methods":[{"name":"asking","parameterTypes":[] }, {"name":"auth","parameterTypes":["java.lang.CharSequence"] }, {"name":"auth","parameterTypes":["java.lang.String","java.lang.CharSequence"] }, {"name":"clusterAddSlots","parameterTypes":["int[]"] }, {"name":"clusterAddSlotsRange","parameterTypes":["io.lettuce.core.Range[]"] }, {"name":"clusterBumpepoch","parameterTypes":[] }, {"name":"clusterCountFailureReports","parameterTypes":["java.lang.String"] }, {"name":"clusterCountKeysInSlot","parameterTypes":["int"] }, {"name":"clusterDelSlots","parameterTypes":["int[]"] }, {"name":"clusterDelSlotsRange","parameterTypes":["io.lettuce.core.Range[]"] }, {"name":"clusterFailover","parameterTypes":["boolean"] }, {"name":"clusterFailover","parameterTypes":["boolean","boolean"] }, {"name":"clusterFlushslots","parameterTypes":[] }, {"name":"clusterForget","parameterTypes":["java.lang.String"] }, {"name":"clusterGetKeysInSlot","parameterTypes":["int","int"] }, {"name":"clusterInfo","parameterTypes":[] }, {"name":"clusterKeyslot","parameterTypes":["java.lang.Object"] }, {"name":"clusterLinks","parameterTypes":[] }, {"name":"clusterMeet","parameterTypes":["java.lang.String","int"] }, {"name":"clusterMyId","parameterTypes":[] }, {"name":"clusterMyShardId","parameterTypes":[] }, {"name":"clusterNodes","parameterTypes":[] }, {"name":"clusterReplicas","parameterTypes":["java.lang.String"] }, {"name":"clusterReplicate","parameterTypes":["java.lang.String"] }, {"name":"clusterReset","parameterTypes":["boolean"] }, {"name":"clusterSaveconfig","parameterTypes":[] }, {"name":"clusterSetConfigEpoch","parameterTypes":["long"] }, {"name":"clusterSetSlotImporting","parameterTypes":["int","java.lang.String"] }, {"name":"clusterSetSlotMigrating","parameterTypes":["int","java.lang.String"] }, {"name":"clusterSetSlotNode","parameterTypes":["int","java.lang.String"] }, {"name":"clusterSetSlotStable","parameterTypes":["int"] }, {"name":"clusterShards","parameterTypes":[] }, {"name":"clusterSlaves","parameterTypes":["java.lang.String"] }, {"name":"clusterSlots","parameterTypes":[] }, {"name":"dispatch","parameterTypes":["io.lettuce.core.protocol.ProtocolKeyword","io.lettuce.core.output.CommandOutput"] }, {"name":"dispatch","parameterTypes":["io.lettuce.core.protocol.ProtocolKeyword","io.lettuce.core.output.CommandOutput","io.lettuce.core.protocol.CommandArgs"] }, {"name":"echo","parameterTypes":["java.lang.Object"] }, {"name":"get","parameterTypes":["java.lang.Object"] }, {"name":"getJsonParser","parameterTypes":[] }, {"name":"mget","parameterTypes":["io.lettuce.core.output.KeyValueStreamingChannel","java.lang.Object[]"] }, {"name":"mget","parameterTypes":["java.lang.Object[]"] }, {"name":"ping","parameterTypes":[] }, {"name":"publish","parameterTypes":["java.lang.Object","java.lang.Object"] }, {"name":"pubsubChannels","parameterTypes":[] }, {"name":"pubsubChannels","parameterTypes":["java.lang.Object"] }, {"name":"pubsubNumpat","parameterTypes":[] }, {"name":"pubsubNumsub","parameterTypes":["java.lang.Object[]"] }, {"name":"pubsubShardChannels","parameterTypes":[] }, {"name":"pubsubShardChannels","parameterTypes":["java.lang.Object"] }, {"name":"pubsubShardNumsub","parameterTypes":["java.lang.Object[]"] }, {"name":"quit","parameterTypes":[] }, {"name":"readOnly","parameterTypes":[] }, {"name":"readWrite","parameterTypes":[] }, {"name":"role","parameterTypes":[] }, {"name":"select","parameterTypes":["int"] }, {"name":"set","parameterTypes":["java.lang.Object","java.lang.Object"] }, {"name":"set","parameterTypes":["java.lang.Object","java.lang.Object","io.lettuce.core.SetArgs"] }, {"name":"setTimeout","parameterTypes":["java.time.Duration"] }, {"name":"spublish","parameterTypes":["java.lang.Object","java.lang.Object"] }, {"name":"swapdb","parameterTypes":["int","int"] }, {"name":"waitForReplication","parameterTypes":["int","long"] }]
+},
+{
+  "name":"io.lettuce.core.ChannelGroupListener",
+  "methods":[{"name":"channelActive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelInactive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }]
+},
+{
+  "name":"io.lettuce.core.ConnectionBuilder$PlainChannelInitializer",
+  "methods":[{"name":"exceptionCaught","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Throwable"] }]
+},
+{
+  "name":"io.lettuce.core.ConnectionEventTrigger",
+  "methods":[{"name":"channelActive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelInactive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"exceptionCaught","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Throwable"] }]
+},
+{
+  "name":"io.lettuce.core.RedisAsyncCommandsImpl",
+  "methods":[{"name":"getStatefulConnection","parameterTypes":[] }]
+},
+{
+  "name":"io.lettuce.core.RedisChannelHandler",
+  "fields":[{"name":"closed"}]
+},
+{
+  "name":"io.lettuce.core.api.sync.BaseRedisCommands",
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"io.lettuce.core.api.sync.RedisCommands",
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"io.lettuce.core.api.sync.RedisStringCommands",
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"io.lettuce.core.cluster.api.sync.RedisClusterCommands",
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"io.lettuce.core.event.connection.JfrConnectEvent",
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":["io.lettuce.core.event.connection.ConnectEvent"] }]
+},
+{
+  "name":"io.lettuce.core.event.connection.JfrConnectionCreatedEvent",
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":["io.lettuce.core.event.connection.ConnectionCreatedEvent"] }]
+},
+{
+  "name":"io.lettuce.core.metrics.DefaultCommandLatencyCollector",
+  "fields":[{"name":"pauseDetectorWrapper"}]
+},
+{
+  "name":"io.lettuce.core.protocol.CommandEncoder"
+},
+{
+  "name":"io.lettuce.core.protocol.CommandHandler",
+  "methods":[{"name":"channelActive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelInactive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelRead","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }, {"name":"channelRegistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelUnregistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"exceptionCaught","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Throwable"] }, {"name":"userEventTriggered","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }, {"name":"write","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object","io.netty.channel.ChannelPromise"] }]
+},
+{
+  "name":"io.lettuce.core.protocol.ConnectionWatchdog",
+  "methods":[{"name":"channelInactive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }]
+},
+{
+  "name":"io.lettuce.core.protocol.DefaultEndpoint",
+  "fields":[{"name":"queueSize"}, {"name":"status"}]
+},
+{
+  "name":"io.lettuce.core.protocol.MaintenanceAwareConnectionWatchdog",
+  "methods":[{"name":"channelActive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelReadComplete","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }]
+},
+{
+  "name":"io.lettuce.core.protocol.RedisHandshakeHandler",
+  "methods":[{"name":"channelActive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelInactive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelRegistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"exceptionCaught","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Throwable"] }]
+},
+{
+  "name":"io.lettuce.core.protocol.SharedLock",
+  "fields":[{"name":"writers"}]
+},
+{
+  "name":"io.netty.buffer.AbstractByteBufAllocator",
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"io.netty.buffer.AbstractReferenceCountedByteBuf",
+  "fields":[{"name":"refCnt"}]
+},
+{
+  "name":"io.netty.buffer.AdaptivePoolingAllocator$Chunk",
+  "fields":[{"name":"refCnt"}]
+},
+{
+  "name":"io.netty.buffer.AdaptivePoolingAllocator$Magazine",
+  "fields":[{"name":"nextInLine"}]
+},
+{
+  "name":"io.netty.channel.AbstractChannelHandlerContext",
+  "fields":[{"name":"handlerState"}]
+},
+{
+  "name":"io.netty.channel.ChannelDuplexHandler",
+  "methods":[{"name":"bind","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.net.SocketAddress","io.netty.channel.ChannelPromise"] }, {"name":"close","parameterTypes":["io.netty.channel.ChannelHandlerContext","io.netty.channel.ChannelPromise"] }, {"name":"connect","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.net.SocketAddress","java.net.SocketAddress","io.netty.channel.ChannelPromise"] }, {"name":"deregister","parameterTypes":["io.netty.channel.ChannelHandlerContext","io.netty.channel.ChannelPromise"] }, {"name":"disconnect","parameterTypes":["io.netty.channel.ChannelHandlerContext","io.netty.channel.ChannelPromise"] }, {"name":"flush","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"read","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }]
+},
+{
+  "name":"io.netty.channel.ChannelHandlerAdapter",
+  "methods":[{"name":"exceptionCaught","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Throwable"] }]
+},
+{
+  "name":"io.netty.channel.ChannelInboundHandlerAdapter",
+  "methods":[{"name":"channelActive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelInactive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelRead","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }, {"name":"channelReadComplete","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelRegistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelUnregistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelWritabilityChanged","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"exceptionCaught","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Throwable"] }, {"name":"userEventTriggered","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }]
+},
+{
+  "name":"io.netty.channel.ChannelInitializer",
+  "methods":[{"name":"channelRegistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"exceptionCaught","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Throwable"] }]
+},
+{
+  "name":"io.netty.channel.ChannelOutboundBuffer",
+  "fields":[{"name":"totalPendingSize"}, {"name":"unwritable"}]
+},
+{
+  "name":"io.netty.channel.ChannelOutboundHandlerAdapter",
+  "methods":[{"name":"bind","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.net.SocketAddress","io.netty.channel.ChannelPromise"] }, {"name":"close","parameterTypes":["io.netty.channel.ChannelHandlerContext","io.netty.channel.ChannelPromise"] }, {"name":"connect","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.net.SocketAddress","java.net.SocketAddress","io.netty.channel.ChannelPromise"] }, {"name":"deregister","parameterTypes":["io.netty.channel.ChannelHandlerContext","io.netty.channel.ChannelPromise"] }, {"name":"disconnect","parameterTypes":["io.netty.channel.ChannelHandlerContext","io.netty.channel.ChannelPromise"] }, {"name":"flush","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"read","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }]
+},
+{
+  "name":"io.netty.channel.DefaultChannelConfig",
+  "fields":[{"name":"autoRead"}, {"name":"writeBufferWaterMark"}]
+},
+{
+  "name":"io.netty.channel.DefaultChannelPipeline",
+  "fields":[{"name":"estimatorHandle"}]
+},
+{
+  "name":"io.netty.channel.DefaultChannelPipeline$HeadContext",
+  "methods":[{"name":"bind","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.net.SocketAddress","io.netty.channel.ChannelPromise"] }, {"name":"channelActive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelInactive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelRead","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }, {"name":"channelReadComplete","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelRegistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelUnregistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelWritabilityChanged","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"close","parameterTypes":["io.netty.channel.ChannelHandlerContext","io.netty.channel.ChannelPromise"] }, {"name":"connect","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.net.SocketAddress","java.net.SocketAddress","io.netty.channel.ChannelPromise"] }, {"name":"deregister","parameterTypes":["io.netty.channel.ChannelHandlerContext","io.netty.channel.ChannelPromise"] }, {"name":"disconnect","parameterTypes":["io.netty.channel.ChannelHandlerContext","io.netty.channel.ChannelPromise"] }, {"name":"exceptionCaught","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Throwable"] }, {"name":"flush","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"read","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"userEventTriggered","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }, {"name":"write","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object","io.netty.channel.ChannelPromise"] }]
+},
+{
+  "name":"io.netty.channel.DefaultChannelPipeline$TailContext",
+  "methods":[{"name":"channelActive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelInactive","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelRead","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }, {"name":"channelReadComplete","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelRegistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelUnregistered","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"channelWritabilityChanged","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }, {"name":"exceptionCaught","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Throwable"] }, {"name":"userEventTriggered","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }]
+},
+{
+  "name":"io.netty.channel.epoll.Epoll"
+},
+{
+  "name":"io.netty.channel.kqueue.KQueue"
+},
+{
+  "name":"io.netty.channel.socket.nio.NioDatagramChannel",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.netty.channel.socket.nio.NioSocketChannel",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.netty.channel.uring.IoUring"
+},
+{
+  "name":"io.netty.handler.codec.MessageToByteEncoder",
+  "methods":[{"name":"write","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object","io.netty.channel.ChannelPromise"] }]
+},
+{
+  "name":"io.netty.handler.codec.MessageToMessageDecoder",
+  "methods":[{"name":"channelRead","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }, {"name":"channelReadComplete","parameterTypes":["io.netty.channel.ChannelHandlerContext"] }]
+},
+{
+  "name":"io.netty.handler.codec.MessageToMessageEncoder",
+  "methods":[{"name":"write","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object","io.netty.channel.ChannelPromise"] }]
+},
+{
+  "name":"io.netty.handler.codec.dns.DatagramDnsQueryEncoder"
+},
+{
+  "name":"io.netty.resolver.dns.Cache$Entries",
+  "fields":[{"name":"expirationFuture"}]
+},
+{
+  "name":"io.netty.resolver.dns.DnsNameResolver$2"
+},
+{
+  "name":"io.netty.resolver.dns.DnsNameResolver$3"
+},
+{
+  "name":"io.netty.resolver.dns.DnsNameResolver$DnsResponseHandler",
+  "methods":[{"name":"channelRead","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Object"] }, {"name":"exceptionCaught","parameterTypes":["io.netty.channel.ChannelHandlerContext","java.lang.Throwable"] }]
+},
+{
+  "name":"io.netty.resolver.dns.macos.MacOSDnsServerAddressStreamProvider"
+},
+{
+  "name":"io.netty.util.DefaultAttributeMap",
+  "fields":[{"name":"attributes"}]
+},
+{
+  "name":"io.netty.util.DefaultAttributeMap$DefaultAttribute",
+  "fields":[{"name":"attributeMap"}]
+},
+{
+  "name":"io.netty.util.HashedWheelTimer",
+  "fields":[{"name":"workerState"}]
+},
+{
+  "name":"io.netty.util.HashedWheelTimer$HashedWheelTimeout",
+  "fields":[{"name":"state"}]
+},
+{
+  "name":"io.netty.util.ResourceLeakDetector$DefaultResourceLeak",
+  "fields":[{"name":"droppedRecords"}, {"name":"head"}]
+},
+{
+  "name":"io.netty.util.concurrent.DefaultPromise",
+  "fields":[{"name":"result"}]
+},
+{
+  "name":"io.netty.util.concurrent.SingleThreadEventExecutor",
+  "fields":[{"name":"accumulatedActiveTimeNanos"}, {"name":"consecutiveBusyCycles"}, {"name":"consecutiveIdleCycles"}, {"name":"state"}, {"name":"threadProperties"}]
+},
+{
+  "name":"io.netty.util.internal.shaded.org.jctools.queues.BaseMpscLinkedArrayQueueColdProducerFields",
+  "fields":[{"name":"producerLimit"}]
+},
+{
+  "name":"io.netty.util.internal.shaded.org.jctools.queues.BaseMpscLinkedArrayQueueConsumerFields",
+  "fields":[{"name":"consumerIndex"}]
+},
+{
+  "name":"io.netty.util.internal.shaded.org.jctools.queues.BaseMpscLinkedArrayQueueProducerFields",
+  "fields":[{"name":"producerIndex"}]
+},
+{
+  "name":"io.netty.util.internal.shaded.org.jctools.queues.MpmcArrayQueueConsumerIndexField",
+  "fields":[{"name":"consumerIndex"}]
+},
+{
+  "name":"io.netty.util.internal.shaded.org.jctools.queues.MpmcArrayQueueProducerIndexField",
+  "fields":[{"name":"producerIndex"}]
+},
+{
+  "name":"java.lang.ProcessHandle",
+  "methods":[{"name":"current","parameterTypes":[] }, {"name":"pid","parameterTypes":[] }]
+},
+{
+  "name":"java.lang.Thread",
+  "fields":[{"name":"threadLocalRandomProbe"}],
+  "methods":[{"name":"isVirtual","parameterTypes":[] }]
+},
+{
+  "name":"java.nio.Bits",
+  "fields":[{"name":"MAX_MEMORY"}, {"name":"UNALIGNED"}]
+},
+{
+  "name":"java.nio.Buffer",
+  "fields":[{"name":"address"}]
+},
+{
+  "name":"java.nio.ByteBuffer",
+  "methods":[{"name":"alignedSlice","parameterTypes":["int"] }]
+},
+{
+  "name":"java.nio.DirectByteBuffer",
+  "methods":[{"name":"<init>","parameterTypes":["long","long"] }]
+},
+{
+  "name":"java.nio.channels.spi.SelectorProvider",
+  "methods":[{"name":"openSocketChannel","parameterTypes":["java.net.ProtocolFamily"] }]
+},
+{
+  "name":"java.util.concurrent.ForkJoinTask",
+  "fields":[{"name":"aux"}, {"name":"status"}]
+},
+{
+  "name":"java.util.concurrent.atomic.AtomicBoolean",
+  "fields":[{"name":"value"}]
+},
+{
+  "name":"java.util.concurrent.atomic.AtomicReference",
+  "fields":[{"name":"value"}]
+},
+{
+  "name":"java.util.concurrent.atomic.Striped64",
+  "fields":[{"name":"base"}, {"name":"cellsBusy"}]
+},
+{
+  "name":"jdk.internal.misc.Unsafe",
+  "methods":[{"name":"getUnsafe","parameterTypes":[] }]
+},
+{
+  "name":"jdk.jfr.Event"
+},
+{
+  "name":"jdk.net.ExtendedSocketOptions",
+  "fields":[{"name":"TCP_KEEPCOUNT"}, {"name":"TCP_KEEPIDLE"}, {"name":"TCP_KEEPINTERVAL"}]
+},
+{
+  "name":"org.HdrHistogram$Histogram"
+},
+{
+  "name":"org.HdrHistogram.Histogram"
+},
+{
+  "name":"org.LatencyUtils$PauseDetector"
+},
+{
+  "name":"org.LatencyUtils.PauseDetector"
+},
+{
+  "name":"reactor.core.publisher$Mono"
+},
+{
+  "name":"reactor.core.publisher.Mono"
+},
+{
+  "name":"sun.misc.Unsafe",
+  "fields":[{"name":"theUnsafe"}],
+  "methods":[{"name":"copyMemory","parameterTypes":["java.lang.Object","long","java.lang.Object","long","long"] }, {"name":"getAndAddLong","parameterTypes":["java.lang.Object","long","long"] }, {"name":"getAndSetObject","parameterTypes":["java.lang.Object","long","java.lang.Object"] }, {"name":"invokeCleaner","parameterTypes":["java.nio.ByteBuffer"] }]
+},
+{
+  "name":"sun.nio.ch.SelectorImpl",
+  "fields":[{"name":"publicSelectedKeys"}, {"name":"selectedKeys"}]
+}
+]
