@@ -15,7 +15,7 @@ public class Main {
     public static void main(String[] args) throws Exception {
         System.out.println("=== Testing Lettuce WITHOUT Reactor ===\n");
 
-        RedisClient client = RedisClient.create("redis://localhost:16379");
+        RedisClient client = RedisClient.create("redis://localhost:6379");
         try {
             StatefulRedisConnection<String, String> connection = client.connect();
             System.out.println("1. Connected using StatefulRedisConnection");
@@ -33,8 +33,12 @@ public class Main {
             String asyncValue = async.get("test:key2").get();
             System.out.println("3. Async API works: test:key2 = " + asyncValue);
 
-            // Cleanup
-            sync.del("test:key", "test:key2");
+            connection.reactive().ping();
+
+            // Test MGET
+            java.util.List<io.lettuce.core.KeyValue<String, String>> mgetResult = sync.mget("test:key", "test:key2");
+            System.out.println("4. Mget API works: got " + mgetResult.size() + " results");
+
             connection.close();
 
             System.out.println("\n=== SUCCESS ===");
