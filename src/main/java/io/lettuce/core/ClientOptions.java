@@ -38,7 +38,6 @@ import io.lettuce.core.protocol.ReadOnlyCommands;
 import io.lettuce.core.protocol.RedisCommand;
 import io.lettuce.core.resource.ClientResources;
 
-
 /**
  * Client Options to control the behavior of {@link RedisClient}.
  *

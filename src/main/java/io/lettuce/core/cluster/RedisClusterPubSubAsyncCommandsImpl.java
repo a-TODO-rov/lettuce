@@ -28,8 +28,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-import io.lettuce.core.GeoArgs;
-import io.lettuce.core.GeoWithin;
 import io.lettuce.core.RedisFuture;
 import io.lettuce.core.RedisURI;
 import io.lettuce.core.cluster.api.NodeSelectionSupport;

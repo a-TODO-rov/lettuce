@@ -24,20 +24,17 @@ import io.lettuce.core.cluster.api.reactive.RedisClusterReactiveCommands;
 import reactor.core.publisher.Mono;
 
 /**
- * A complete reactive and thread-safe Redis API with 400+ Methods.
+ * A minimal reactive and thread-safe Redis API with SET, GET, MGET commands.
+ * <p>
+ * Stripped down for PoC - full infrastructure (cluster, sentinel, pub/sub) is still supported.
  *
  * @param <K> Key type.
  * @param <V> Value type.
  * @author Mark Paluch
  * @since 5.0
  */
-public interface RedisReactiveCommands<K, V> extends BaseRedisReactiveCommands<K, V>, RedisAclReactiveCommands<K, V>,
-        RedisClusterReactiveCommands<K, V>, RedisFunctionReactiveCommands<K, V>, RedisGeoReactiveCommands<K, V>,
-        RedisHashReactiveCommands<K, V>, RedisHLLReactiveCommands<K, V>, RedisKeyReactiveCommands<K, V>,
-        RedisListReactiveCommands<K, V>, RedisScriptingReactiveCommands<K, V>, RedisServerReactiveCommands<K, V>,
-        RedisSetReactiveCommands<K, V>, RedisSortedSetReactiveCommands<K, V>, RedisStreamReactiveCommands<K, V>,
-        RedisStringReactiveCommands<K, V>, RedisTransactionalReactiveCommands<K, V>, RedisJsonReactiveCommands<K, V>,
-        RedisVectorSetReactiveCommands<K, V>, RediSearchReactiveCommands<K, V> {
+public interface RedisReactiveCommands<K, V>
+        extends BaseRedisReactiveCommands<K, V>, RedisClusterReactiveCommands<K, V>, RedisStringReactiveCommands<K, V> {
 
     /**
      * Authenticate to the server.

@@ -94,12 +94,11 @@ class SentinelTopologyProvider implements TopologyProvider {
                     .map(map -> toNode(map, RedisInstance.Role.REPLICA)).collect(Collectors.toList()));
 
             return result;
-        }).thenCompose(nodes -> ResumeAfter.close(connection).thenEmit(nodes))
-                .whenComplete((nodes, t) -> {
-                    if (t != null) {
-                        connection.closeAsync();
-                    }
-                });
+        }).thenCompose(nodes -> ResumeAfter.close(connection).thenEmit(nodes)).whenComplete((nodes, t) -> {
+            if (t != null) {
+                connection.closeAsync();
+            }
+        });
     }
 
     private static boolean isAvailable(Map<String, String> map) {
