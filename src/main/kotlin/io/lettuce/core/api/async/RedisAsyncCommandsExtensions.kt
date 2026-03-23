@@ -19,22 +19,4 @@
  */
 package io.lettuce.core.api.async
 
-import io.lettuce.core.ExperimentalLettuceCoroutinesApi
-import io.lettuce.core.TransactionResult
-import kotlinx.coroutines.future.await
-
-/**
- * Allows to create transaction DSL block with [RedisAsyncCommands].
- *
- * @author Mikhael Sokolov
- * @since 6.0
- */
-@ExperimentalLettuceCoroutinesApi
-suspend inline fun <K, V> RedisAsyncCommands<K, V>.multi(action: RedisAsyncCommands<K, V>.() -> Unit): TransactionResult = try {
-    multi().await()
-    action.invoke(this)
-    exec().await()
-} catch (thr: Throwable) {
-    discard().await()
-    throw thr
-}
+// Transaction DSL removed for PoC - only GET, SET, MGET commands are supported.

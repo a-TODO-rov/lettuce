@@ -19,22 +19,4 @@
  */
 package io.lettuce.core.api.coroutines
 
-import io.lettuce.core.ExperimentalLettuceCoroutinesApi
-import io.lettuce.core.TransactionResult
-
-/**
- * Allows to create transaction DSL block with [RedisCoroutinesCommands].
- *
- * @author Mikhael Sokolov
- * @since 6.0
- * @deprecated since 6.1.6
- */
-@ExperimentalLettuceCoroutinesApi
-suspend inline fun <K : Any, V : Any> RedisCoroutinesCommands<K, V>.multi(action: RedisCoroutinesCommands<K, V>.() -> Unit): TransactionResult? = try {
-    multi()
-    action.invoke(this)
-    exec()
-} catch (thr: Throwable) {
-    discard()
-    throw thr
-}
+// Transaction DSL removed for PoC - only GET, SET, MGET commands are supported.

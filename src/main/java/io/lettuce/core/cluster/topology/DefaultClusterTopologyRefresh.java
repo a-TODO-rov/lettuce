@@ -51,6 +51,10 @@ import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.cluster.models.partitions.Partitions;
 import io.lettuce.core.cluster.models.partitions.RedisClusterNode;
 import io.lettuce.core.codec.StringCodec;
+import io.lettuce.core.output.StatusOutput;
+import io.lettuce.core.protocol.CommandArgs;
+import io.lettuce.core.protocol.CommandKeyword;
+import io.lettuce.core.protocol.CommandType;
 import io.lettuce.core.internal.ExceptionFactory;
 import io.lettuce.core.internal.Exceptions;
 import io.lettuce.core.internal.Futures;
@@ -351,7 +355,10 @@ class DefaultClusterTopologyRefresh implements ClusterTopologyRefresh {
 
                         sync.completeExceptionally(new RedisConnectionException(message, throwableToUse));
                     } else {
-                        connection.async().clientSetname("lettuce#ClusterTopologyRefresh");
+                        connection.async().dispatch(CommandType.CLIENT,
+                                new StatusOutput<>(StringCodec.UTF8),
+                                new CommandArgs<>(StringCodec.UTF8).add(CommandKeyword.SETNAME)
+                                        .add("lettuce#ClusterTopologyRefresh"));
 
                         // avoid leaking resources
                         if (!sync.complete(connection)) {

@@ -25,7 +25,9 @@ import io.lettuce.core.cluster.api.async.RedisClusterAsyncCommands;
 import io.lettuce.core.json.JsonParser;
 
 /**
- * A complete asynchronous and thread-safe Redis API with 400+ Methods.
+ * A minimal asynchronous and thread-safe Redis API with SET, GET, MGET commands.
+ * <p>
+ * Stripped down for PoC - full infrastructure (cluster, sentinel, pub/sub) is still supported.
  *
  * @param <K> Key type.
  * @param <V> Value type.
@@ -33,13 +35,8 @@ import io.lettuce.core.json.JsonParser;
  * @author Tihomir Mateev
  * @since 3.0
  */
-public interface RedisAsyncCommands<K, V> extends BaseRedisAsyncCommands<K, V>, RedisAclAsyncCommands<K, V>,
-        RedisClusterAsyncCommands<K, V>, RedisFunctionAsyncCommands<K, V>, RedisGeoAsyncCommands<K, V>,
-        RedisHashAsyncCommands<K, V>, RedisHLLAsyncCommands<K, V>, RedisKeyAsyncCommands<K, V>, RedisListAsyncCommands<K, V>,
-        RedisScriptingAsyncCommands<K, V>, RedisServerAsyncCommands<K, V>, RedisSetAsyncCommands<K, V>,
-        RedisSortedSetAsyncCommands<K, V>, RedisStreamAsyncCommands<K, V>, RedisStringAsyncCommands<K, V>,
-        RedisTransactionalAsyncCommands<K, V>, RedisJsonAsyncCommands<K, V>, RedisVectorSetAsyncCommands<K, V>,
-        RediSearchAsyncCommands<K, V> {
+public interface RedisAsyncCommands<K, V> extends BaseRedisAsyncCommands<K, V>, RedisClusterAsyncCommands<K, V>,
+        RedisStringAsyncCommands<K, V> {
 
     /**
      * Authenticate to the server.
