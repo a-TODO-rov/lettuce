@@ -42,7 +42,7 @@ import io.lettuce.core.internal.HostAndPort;
 import io.lettuce.core.internal.LettuceAssert;
 import io.lettuce.core.internal.LettuceSets;
 import io.lettuce.core.internal.LettuceStrings;
-import reactor.core.publisher.Mono;
+
 
 /**
  * Redis URI. Contains connection details for the Redis/Sentinel connections. You can provide the database, client name,
@@ -519,7 +519,7 @@ public class RedisURI implements Serializable, ConnectionPoint {
     public void setAuthentication(String username, char[] password) {
         LettuceAssert.notNull(password, "Password must not be null");
 
-        this.setCredentialsProvider(() -> Mono.just(RedisCredentials.just(username, password)));
+        this.setCredentialsProvider(new StaticCredentialsProvider(username, password));
     }
 
     /**
@@ -536,7 +536,11 @@ public class RedisURI implements Serializable, ConnectionPoint {
     public void setAuthentication(String username, CharSequence password) {
         LettuceAssert.notNull(password, "Password must not be null");
 
-        this.setCredentialsProvider(() -> Mono.just(RedisCredentials.just(username, password)));
+        char[] chars = new char[password.length()];
+        for (int i = 0; i < password.length(); i++) {
+            chars[i] = password.charAt(i);
+        }
+        this.setCredentialsProvider(new StaticCredentialsProvider(username, chars));
     }
 
     /**
@@ -1755,7 +1759,11 @@ public class RedisURI implements Serializable, ConnectionPoint {
             LettuceAssert.notNull(username, "User name must not be null");
             LettuceAssert.notNull(password, "Password must not be null");
 
-            return withAuthentication(() -> Mono.just(RedisCredentials.just(username, password)));
+            char[] chars = new char[password.length()];
+            for (int i = 0; i < password.length(); i++) {
+                chars[i] = password.charAt(i);
+            }
+            return withAuthentication(new StaticCredentialsProvider(username, chars));
         }
 
         /**
@@ -1785,7 +1793,7 @@ public class RedisURI implements Serializable, ConnectionPoint {
             LettuceAssert.notNull(username, "User name must not be null");
             LettuceAssert.notNull(password, "Password must not be null");
 
-            return withAuthentication(() -> Mono.just(RedisCredentials.just(username, password)));
+            return withAuthentication(new StaticCredentialsProvider(username, password));
         }
 
         /**
@@ -1826,7 +1834,7 @@ public class RedisURI implements Serializable, ConnectionPoint {
          * @since 4.4
          */
         public Builder withPassword(char[] password) {
-            return withAuthentication(() -> Mono.just(RedisCredentials.just(null, password)));
+            return withAuthentication(new StaticCredentialsProvider(null, password));
         }
 
         /**
