@@ -980,7 +980,8 @@ public class RedisURI implements Serializable, ConnectionPoint {
                     creds = ((RedisCredentialsProvider.ImmediateRedisCredentialsProvider) credentialsProvider)
                             .resolveCredentialsNow();
                 } else {
-                    creds = credentialsProvider.resolveCredentials().block();
+                    throw new UnsupportedOperationException(
+                            "Non-immediate RedisCredentialsProvider requires reactor-core on the classpath");
                 }
                 if (creds != null) {
                     String credentials = "";
