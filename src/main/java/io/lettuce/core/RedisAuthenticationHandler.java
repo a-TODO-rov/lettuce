@@ -22,8 +22,7 @@ import io.lettuce.core.protocol.ProtocolVersion;
 import io.lettuce.core.protocol.RedisCommand;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
-import reactor.core.Disposable;
-import reactor.core.publisher.Flux;
+
 
 import java.util.Collection;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -49,7 +48,8 @@ public class RedisAuthenticationHandler<K, V> {
 
     private final RedisCredentialsProvider credentialsProvider;
 
-    private final AtomicReference<Disposable> credentialsSubscription = new AtomicReference<>();
+    // Use Object to avoid loading reactor.core.Disposable at class init time (GraalVM native image without reactor)
+    private final AtomicReference<Object> credentialsSubscription = new AtomicReference<>();
 
     private final Boolean isPubSubConnection;
 
@@ -129,13 +129,21 @@ public class RedisAuthenticationHandler<K, V> {
             return;
         }
 
-        Flux<RedisCredentials> credentialsFlux = credentialsProvider.credentials();
+        // Use reflection to avoid compile-time references to reactor types (Flux, Disposable),
+        // which would fail GraalVM native image builds when reactor-core is not on the classpath.
+        try {
+            java.lang.reflect.Method credentialsMethod = credentialsProvider.getClass().getMethod("credentials");
+            Object credentialsFlux = credentialsMethod.invoke(credentialsProvider);
+            java.lang.reflect.Method subscribeMethod = credentialsFlux.getClass().getMethod("subscribe",
+                    java.util.function.Consumer.class, java.util.function.Consumer.class, Runnable.class);
+            Object subscription = subscribeMethod.invoke(credentialsFlux,
+                    (java.util.function.Consumer<RedisCredentials>) this::onNext,
+                    (java.util.function.Consumer<Throwable>) this::onError, (Runnable) this::complete);
 
-        Disposable subscription = credentialsFlux.subscribe(this::onNext, this::onError, this::complete);
-
-        Disposable oldSubscription = credentialsSubscription.getAndSet(subscription);
-        if (oldSubscription != null && !oldSubscription.isDisposed()) {
-            oldSubscription.dispose();
+            Object oldSubscription = credentialsSubscription.getAndSet(subscription);
+            disposeIfNeeded(oldSubscription);
+        } catch (Exception e) {
+            throw new RedisException("Failed to subscribe to credentials stream", e);
         }
     }
 
@@ -143,9 +151,17 @@ public class RedisAuthenticationHandler<K, V> {
      * Unsubscribes from the current credentials stream.
      */
     public void unsubscribe() {
-        Disposable subscription = credentialsSubscription.getAndSet(null);
-        if (subscription != null && !subscription.isDisposed()) {
-            subscription.dispose();
+        Object subscription = credentialsSubscription.getAndSet(null);
+        disposeIfNeeded(subscription);
+    }
+
+    private static void disposeIfNeeded(Object subscription) {
+        if (subscription != null) {
+            try {
+                subscription.getClass().getMethod("dispose").invoke(subscription);
+            } catch (Exception e) {
+                throw new RedisException("Failed to dispose credentials subscription", e);
+            }
         }
     }
 

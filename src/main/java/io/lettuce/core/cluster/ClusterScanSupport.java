@@ -59,24 +59,11 @@ class ClusterScanSupport {
 
     };
 
-    /**
-     * Map a {@link Mono} of {@link KeyScanCursor} to a {@link Mono} of {@link ClusterKeyScanCursor}.
-     */
-    static final ScanCursorMapper<Mono<KeyScanCursor<?>>> reactiveKeyScanCursorMapper = (nodeIds, currentNodeId,
-            cursor) -> cursor.map(keyScanCursor -> new ClusterKeyScanCursor<>(nodeIds, currentNodeId, keyScanCursor));
+    // Reactive mappers are lazily initialized to avoid loading reactor.core.publisher.Mono at class init time,
+    // which would fail when reactor-core is not on the classpath (e.g. GraalVM native image without reactor).
+    private static volatile ScanCursorMapper<Mono<KeyScanCursor<?>>> reactiveKeyScanCursorMapper;
 
-    /**
-     * Map a {@link Mono} of {@link StreamScanCursor} to a {@link Mono} of {@link ClusterStreamScanCursor}.
-     */
-    static final ScanCursorMapper<Mono<StreamScanCursor>> reactiveStreamScanCursorMapper = (nodeIds, currentNodeId,
-            cursor) -> cursor.map(new Function<StreamScanCursor, StreamScanCursor>() {
-
-                @Override
-                public StreamScanCursor apply(StreamScanCursor streamScanCursor) {
-                    return new ClusterStreamScanCursor(nodeIds, currentNodeId, streamScanCursor);
-                }
-
-            });
+    private static volatile ScanCursorMapper<Mono<StreamScanCursor>> reactiveStreamScanCursorMapper;
 
     /**
      * Retrieve the cursor to continue the scan.
@@ -206,11 +193,27 @@ class ClusterScanSupport {
         return futureStreamScanCursorMapper;
     }
 
+    @SuppressWarnings("unchecked")
     static <K> ScanCursorMapper<Mono<KeyScanCursor<K>>> reactiveClusterKeyScanCursorMapper() {
+        if (reactiveKeyScanCursorMapper == null) {
+            reactiveKeyScanCursorMapper = (nodeIds, currentNodeId, cursor) -> cursor
+                    .map(keyScanCursor -> new ClusterKeyScanCursor<>(nodeIds, currentNodeId, keyScanCursor));
+        }
         return (ScanCursorMapper) reactiveKeyScanCursorMapper;
     }
 
     static ScanCursorMapper<Mono<StreamScanCursor>> reactiveClusterStreamScanCursorMapper() {
+        if (reactiveStreamScanCursorMapper == null) {
+            reactiveStreamScanCursorMapper = (nodeIds, currentNodeId, cursor) -> cursor
+                    .map(new Function<StreamScanCursor, StreamScanCursor>() {
+
+                        @Override
+                        public StreamScanCursor apply(StreamScanCursor streamScanCursor) {
+                            return new ClusterStreamScanCursor(nodeIds, currentNodeId, streamScanCursor);
+                        }
+
+                    });
+        }
         return reactiveStreamScanCursorMapper;
     }
 

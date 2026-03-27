@@ -820,8 +820,8 @@ public class DefaultClientResources implements ClientResources {
      */
     private static EventBus createEventBus(EventExecutorGroup eventExecutorGroup) {
         if (ReactorProvider.isAvailable()) {
-            io.lettuce.core.event.ReactorEventBus reactorEventBus = new io.lettuce.core.event.ReactorEventBus(
-                    reactor.core.scheduler.Schedulers.fromExecutorService(eventExecutorGroup, "lettuce-event-bus"));
+            io.lettuce.core.event.ReactorEventBus reactorEventBus = io.lettuce.core.event.ReactorEventBus
+                    .create(eventExecutorGroup);
             return new DefaultEventBus(reactorEventBus);
         }
         return new DefaultEventBus();

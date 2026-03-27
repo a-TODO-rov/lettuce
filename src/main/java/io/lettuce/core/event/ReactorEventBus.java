@@ -1,8 +1,10 @@
 package io.lettuce.core.event;
 
+import io.netty.util.concurrent.EventExecutorGroup;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 import io.lettuce.core.event.jfr.EventRecorder;
 
 /**
@@ -21,6 +23,15 @@ public class ReactorEventBus implements ReactiveEventBus {
     private final Scheduler scheduler;
 
     private final EventRecorder recorder = EventRecorder.getInstance();
+
+    /**
+     * Create a {@link ReactorEventBus} using the given {@link EventExecutorGroup}.
+     * This factory method keeps the reference to {@code reactor.core.scheduler.Schedulers}
+     * contained within this class, avoiding classloading issues when reactor is not on the classpath.
+     */
+    public static ReactorEventBus create(EventExecutorGroup eventExecutorGroup) {
+        return new ReactorEventBus(Schedulers.fromExecutorService(eventExecutorGroup, "lettuce-event-bus"));
+    }
 
     public ReactorEventBus(Scheduler scheduler) {
         this.bus = Sinks.many().multicast().directBestEffort();
