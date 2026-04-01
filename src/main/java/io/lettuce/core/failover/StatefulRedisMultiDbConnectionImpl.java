@@ -467,7 +467,6 @@ class StatefulRedisMultiDbConnectionImpl<C extends StatefulRedisConnection<K, V>
      *
      * @return the reactive commands API.
      */
-    @Override
     public RedisReactiveCommands<K, V> reactive() {
         return reactive;
     }

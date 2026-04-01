@@ -143,7 +143,13 @@ public class StatefulRedisConnectionImpl<K, V> extends RedisChannelHandler<K, V>
         return new RedisAsyncCommandsImpl<>(this, codec, parser);
     }
 
-    @Override
+    /**
+     * Returns the {@link RedisReactiveCommands} API for the current connection. Does not create a new connection.
+     * <p>
+     * Prefer using {@link RedisReactiveCommands#from(StatefulRedisConnection)} to obtain the reactive API.
+     *
+     * @return the reactive API for the underlying connection.
+     */
     public RedisReactiveCommands<K, V> reactive() {
         ReactorProvider.checkForReactorLibrary();
         RedisReactiveCommandsImpl<K, V> result = reactive;

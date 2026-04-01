@@ -55,9 +55,8 @@ class MasterSlaveConnectionWrapper<K, V> implements StatefulRedisMasterSlaveConn
         return delegate.async();
     }
 
-    @Override
     public RedisReactiveCommands<K, V> reactive() {
-        return delegate.reactive();
+        return RedisReactiveCommands.from(delegate);
     }
 
     @Override

@@ -25,9 +25,9 @@ public class ReactorEventBus implements ReactiveEventBus {
     private final EventRecorder recorder = EventRecorder.getInstance();
 
     /**
-     * Create a {@link ReactorEventBus} using the given {@link EventExecutorGroup}.
-     * This factory method keeps the reference to {@code reactor.core.scheduler.Schedulers}
-     * contained within this class, avoiding classloading issues when reactor is not on the classpath.
+     * Create a {@link ReactorEventBus} using the given {@link EventExecutorGroup}. This factory method keeps the reference to
+     * {@code reactor.core.scheduler.Schedulers} contained within this class, avoiding classloading issues when reactor is not
+     * on the classpath.
      */
     public static ReactorEventBus create(EventExecutorGroup eventExecutorGroup) {
         return new ReactorEventBus(Schedulers.fromExecutorService(eventExecutorGroup, "lettuce-event-bus"));
