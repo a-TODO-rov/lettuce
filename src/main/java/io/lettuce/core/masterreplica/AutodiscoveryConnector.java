@@ -86,8 +86,9 @@ class AutodiscoveryConnector<K, V> implements MasterReplicaConnector<K, V> {
                 for (StatefulRedisConnection<?, ?> connection : initialConnections.values()) {
                     closeFutures.add(connection.closeAsync());
                 }
-                return Futures.allOf(closeFutures).thenCompose(v -> Futures.<StatefulRedisMasterReplicaConnection<K, V>> failed(
-                        t instanceof ExecutionException ? t.getCause() : t));
+                return Futures.allOf(closeFutures)
+                        .thenCompose(v -> Futures.<StatefulRedisMasterReplicaConnection<K, V>> failed(
+                                t instanceof ExecutionException ? t.getCause() : t));
             }
             return CompletableFuture.completedFuture(result);
         }).thenCompose(java.util.function.Function.identity());

@@ -47,11 +47,16 @@ public class OutputRegistry {
 
         register(registry, BooleanOutput.class, BooleanOutput::new);
         register(registry, BooleanListOutput.class, BooleanListOutput::new);
+        register(registry, GeoCoordinatesListOutput.class, GeoCoordinatesListOutput::new);
+        register(registry, GeoCoordinatesValueListOutput.class, GeoCoordinatesValueListOutput::new);
+        register(registry, ScoredValueListOutput.class, ScoredValueListOutput::new);
         register(registry, ValueValueListOutput.class, ValueValueListOutput::new);
         register(registry, StringValueListOutput.class, StringValueListOutput::new);
 
         register(registry, StringListOutput.class, StringListOutput::new);
         register(registry, VoidOutput.class, VoidOutput::new);
+
+        register(registry, StringMatchResultOutput.class, StringMatchResultOutput::new);
 
         BUILTIN.putAll(registry);
     }

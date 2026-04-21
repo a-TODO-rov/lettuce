@@ -23,14 +23,16 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
+import io.lettuce.core.HotkeysArgs;
+import io.lettuce.core.HotkeysReply;
+import io.lettuce.core.MSetExArgs;
 import io.lettuce.core.Range;
+import io.lettuce.core.SetArgs;
 import io.lettuce.core.api.sync.*;
 import io.lettuce.core.json.JsonParser;
 
 /**
- * A minimal synchronous and thread-safe Redis Cluster API with SET, GET, MGET commands.
- * <p>
- * Stripped down for PoC - full infrastructure (cluster, sentinel, pub/sub) is still supported.
+ * A complete synchronous and thread-safe Redis Cluster API with 400+ Methods.
  *
  * @param <K> Key type.
  * @param <V> Value type.
@@ -39,7 +41,11 @@ import io.lettuce.core.json.JsonParser;
  * @author Tihomir Mateev
  * @since 4.0
  */
-public interface RedisClusterCommands<K, V> extends BaseRedisCommands<K, V>, RedisStringCommands<K, V> {
+public interface RedisClusterCommands<K, V> extends BaseRedisCommands<K, V>, RedisAclCommands<K, V>,
+        RedisFunctionCommands<K, V>, RedisGeoCommands<K, V>, RedisHashCommands<K, V>, RedisHLLCommands<K, V>,
+        RedisKeyCommands<K, V>, RedisListCommands<K, V>, RedisScriptingCommands<K, V>, RedisServerCommands<K, V>,
+        RedisSetCommands<K, V>, RedisSortedSetCommands<K, V>, RedisStreamCommands<K, V>, RedisStringCommands<K, V>,
+        RedisJsonCommands<K, V>, RedisVectorSetCommands<K, V>, RediSearchCommands<K, V> {
 
     /**
      * Set the default timeout for operations. A zero timeout value indicates to not time out.
@@ -382,5 +388,64 @@ public interface RedisClusterCommands<K, V> extends BaseRedisCommands<K, V>, Red
      * @since 6.5
      */
     JsonParser getJsonParser();
+
+    /**
+     * Set multiple keys to multiple values with optional conditions and expiration. Emits: numkeys, pairs, then [NX|XX] and one
+     * of [EX|PX|EXAT|PXAT|KEEPTTL]. Cross-slot keys will result in multiple calls to the particular cluster nodes.
+     *
+     * @param map the map of keys and values.
+     * @param args the {@link MSetExArgs} specifying NX/XX and expiration.
+     * @return Boolean from integer-reply: {@code 1} if all keys were set, {@code 0} otherwise.
+     * @since 7.1
+     */
+    Boolean msetex(Map<K, V> map, MSetExArgs args);
+
+    /**
+     * HOTKEYS commands are not supported on the cluster client. Use node selection API or target specific nodes via
+     * {@code getConnection(nodeId)}.
+     *
+     * @throws UnsupportedOperationException HOTKEYS is a node-specific command
+     */
+    @Override
+    default String hotkeysStart(HotkeysArgs args) {
+        throw new UnsupportedOperationException(
+                "HOTKEYS commands are not supported on cluster client. Use node selection API or target specific nodes.");
+    }
+
+    /**
+     * HOTKEYS commands are not supported on the cluster client. Use node selection API or target specific nodes via
+     * {@code getConnection(nodeId)}.
+     *
+     * @throws UnsupportedOperationException HOTKEYS is a node-specific command
+     */
+    @Override
+    default String hotkeysStop() {
+        throw new UnsupportedOperationException(
+                "HOTKEYS commands are not supported on cluster client. Use node selection API or target specific nodes.");
+    }
+
+    /**
+     * HOTKEYS commands are not supported on the cluster client. Use node selection API or target specific nodes via
+     * {@code getConnection(nodeId)}.
+     *
+     * @throws UnsupportedOperationException HOTKEYS is a node-specific command
+     */
+    @Override
+    default String hotkeysReset() {
+        throw new UnsupportedOperationException(
+                "HOTKEYS commands are not supported on cluster client. Use node selection API or target specific nodes.");
+    }
+
+    /**
+     * HOTKEYS commands are not supported on the cluster client. Use node selection API or target specific nodes via
+     * {@code getConnection(nodeId)}.
+     *
+     * @throws UnsupportedOperationException HOTKEYS is a node-specific command
+     */
+    @Override
+    default HotkeysReply hotkeysGet() {
+        throw new UnsupportedOperationException(
+                "HOTKEYS commands are not supported on cluster client. Use node selection API or target specific nodes.");
+    }
 
 }

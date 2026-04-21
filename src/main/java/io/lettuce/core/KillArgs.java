@@ -179,7 +179,7 @@ public class KillArgs implements CompositeArgument {
      * By default this option is enabled, that is, the client calling the command will not get killed, however setting this
      * option to no will have the effect of also killing the client calling the command.
      *
-     * @return {@code this} {@link KillArgs}.
+     * @return {@code this} {@link MigrateArgs}.
      */
     public KillArgs skipme() {
         return this.skipme(true);

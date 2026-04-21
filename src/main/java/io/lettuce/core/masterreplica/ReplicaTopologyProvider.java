@@ -28,12 +28,8 @@ import java.util.regex.Pattern;
 import io.lettuce.core.RedisFuture;
 import io.lettuce.core.RedisURI;
 import io.lettuce.core.api.StatefulRedisConnection;
-import io.lettuce.core.codec.StringCodec;
 import io.lettuce.core.internal.Exceptions;
 import io.lettuce.core.internal.LettuceAssert;
-import io.lettuce.core.output.StatusOutput;
-import io.lettuce.core.protocol.CommandArgs;
-import io.lettuce.core.protocol.CommandType;
 import io.lettuce.core.models.role.RedisInstance;
 import io.lettuce.core.models.role.RedisNodeDescription;
 import io.netty.util.internal.logging.InternalLogger;
@@ -109,9 +105,7 @@ class ReplicaTopologyProvider implements TopologyProvider {
 
         logger.debug("Performing topology lookup");
 
-        @SuppressWarnings("unchecked")
-        String info = (String) ((StatefulRedisConnection) connection).sync().dispatch(CommandType.INFO,
-                new StatusOutput<>(StringCodec.UTF8), new CommandArgs<>(StringCodec.UTF8).add("replication"));
+        String info = connection.sync().info("replication");
         try {
             return getNodesFromInfo(info);
         } catch (RuntimeException e) {
@@ -124,9 +118,7 @@ class ReplicaTopologyProvider implements TopologyProvider {
 
         logger.debug("Performing topology lookup");
 
-        @SuppressWarnings("unchecked")
-        RedisFuture<String> info = ((StatefulRedisConnection) connection).async().dispatch(CommandType.INFO,
-                new StatusOutput<>(StringCodec.UTF8), new CommandArgs<>(StringCodec.UTF8).add("replication"));
+        RedisFuture<String> info = connection.async().info("replication");
 
         try {
             return info.toCompletableFuture().thenApply(this::getNodesFromInfo);

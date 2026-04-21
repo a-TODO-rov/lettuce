@@ -24,9 +24,8 @@ import io.lettuce.core.cluster.api.sync.RedisClusterCommands;
 import io.lettuce.core.json.JsonParser;
 
 /**
- * A minimal synchronous and thread-safe Redis API with SET, GET, MGET commands.
- * <p>
- * Stripped down for PoC - full infrastructure (cluster, sentinel, pub/sub) is still supported.
+ *
+ * A complete synchronous and thread-safe Redis API with 400+ Methods.
  *
  * @param <K> Key type.
  * @param <V> Value type.
@@ -34,7 +33,11 @@ import io.lettuce.core.json.JsonParser;
  * @author Tihomir Mateev
  * @since 3.0
  */
-public interface RedisCommands<K, V> extends BaseRedisCommands<K, V>, RedisClusterCommands<K, V>, RedisStringCommands<K, V> {
+public interface RedisCommands<K, V> extends BaseRedisCommands<K, V>, RedisAclCommands<K, V>, RedisClusterCommands<K, V>,
+        RedisFunctionCommands<K, V>, RedisGeoCommands<K, V>, RedisHashCommands<K, V>, RedisHLLCommands<K, V>,
+        RedisKeyCommands<K, V>, RedisListCommands<K, V>, RedisScriptingCommands<K, V>, RedisServerCommands<K, V>,
+        RedisSetCommands<K, V>, RedisSortedSetCommands<K, V>, RedisStreamCommands<K, V>, RedisStringCommands<K, V>,
+        RedisTransactionalCommands<K, V>, RedisJsonCommands<K, V>, RedisVectorSetCommands<K, V>, RediSearchCommands<K, V> {
 
     /**
      * Authenticate to the server.

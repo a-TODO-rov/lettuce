@@ -9,11 +9,6 @@ import io.lettuce.core.StatefulRedisConnectionImpl;
 import io.lettuce.core.TrackingArgs;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.codec.RedisCodec;
-import io.lettuce.core.codec.StringCodec;
-import io.lettuce.core.output.StatusOutput;
-import io.lettuce.core.protocol.CommandArgs;
-import io.lettuce.core.protocol.CommandKeyword;
-import io.lettuce.core.protocol.CommandType;
 
 /**
  * Utility to provide server-side assistance for client-side caches. This is a {@link CacheFrontend} that represents a two-level
@@ -68,9 +63,7 @@ public class ClientSideCaching<K, V> implements CacheFrontend<K, V> {
     public static <K, V> CacheFrontend<K, V> enable(CacheAccessor<K, V> cacheAccessor, StatefulRedisConnection<K, V> connection,
             TrackingArgs tracking) {
 
-        CommandArgs<K, V> args = new CommandArgs<>(connection.getCodec()).add(CommandKeyword.TRACKING);
-        tracking.build(args);
-        connection.sync().dispatch(CommandType.CLIENT, new StatusOutput<>(connection.getCodec()), args);
+        connection.sync().clientTracking(tracking);
 
         return create(cacheAccessor, connection);
     }

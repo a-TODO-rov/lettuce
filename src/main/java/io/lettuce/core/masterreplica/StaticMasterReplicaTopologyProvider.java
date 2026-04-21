@@ -77,7 +77,8 @@ class StaticMasterReplicaTopologyProvider implements TopologyProvider {
             }
 
             if (nodeDescriptions.isEmpty()) {
-                throw new RedisConnectionException(String.format("Failed to connect to at least one node in %s", redisURIs));
+                throw new RedisConnectionException(
+                        String.format("Failed to connect to at least one node in %s", redisURIs));
             }
 
             return (List<RedisNodeDescription>) nodeDescriptions;
@@ -86,15 +87,17 @@ class StaticMasterReplicaTopologyProvider implements TopologyProvider {
 
     private CompletableFuture<RedisNodeDescription> getNodeDescription(RedisURI uri) {
 
-        return redisClient.connectAsync(StringCodec.UTF8, uri).toCompletableFuture().thenCompose(connection -> {
-            return getNodeDescription(uri, connection).thenCompose(it -> ResumeAfter.close(connection).thenEmit(it));
-        }).handle((result, t) -> {
-            if (t != null) {
-                logger.warn("Cannot connect to {}", uri, t);
-                return null;
-            }
-            return result;
-        });
+        return redisClient.connectAsync(StringCodec.UTF8, uri).toCompletableFuture()
+                .thenCompose(connection -> {
+                    return getNodeDescription(uri, connection)
+                            .thenCompose(it -> ResumeAfter.close(connection).thenEmit(it));
+                }).handle((result, t) -> {
+                    if (t != null) {
+                        logger.warn("Cannot connect to {}", uri, t);
+                        return null;
+                    }
+                    return result;
+                });
     }
 
     @SuppressWarnings({ "unchecked", "rawtypes" })

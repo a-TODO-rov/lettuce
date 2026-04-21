@@ -43,6 +43,7 @@ import io.lettuce.core.internal.LettuceAssert;
 import io.lettuce.core.internal.LettuceSets;
 import io.lettuce.core.internal.LettuceStrings;
 
+
 /**
  * Redis URI. Contains connection details for the Redis/Sentinel connections. You can provide the database, client name,
  * password and timeouts within the RedisURI.

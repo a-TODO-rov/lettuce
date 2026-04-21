@@ -11,10 +11,6 @@ import io.lettuce.core.RedisURI;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.cluster.models.partitions.Partitions;
 import io.lettuce.core.codec.StringCodec;
-import io.lettuce.core.output.StatusOutput;
-import io.lettuce.core.protocol.CommandArgs;
-import io.lettuce.core.protocol.CommandKeyword;
-import io.lettuce.core.protocol.CommandType;
 import io.lettuce.core.internal.LettuceLists;
 import io.lettuce.core.models.role.RedisNodeDescription;
 import io.netty.util.internal.logging.InternalLogger;
@@ -72,7 +68,8 @@ class MasterReplicaTopologyRefresh {
                     CompletionStage<List<RedisNodeDescription>> nodes = requests.getOrTimeout(seed.getTimeout(),
                             eventExecutors);
 
-                    return nodes.toCompletableFuture().thenCompose(it -> ResumeAfter.close(connections).thenEmit(it));
+                    return nodes.toCompletableFuture()
+                            .thenCompose(it -> ResumeAfter.close(connections).thenEmit(it));
                 });
     }
 
@@ -110,9 +107,7 @@ class MasterReplicaTopologyRefresh {
 
                         sync.completeExceptionally(new RedisConnectionException(message, throwable));
                     } else {
-                        connection.async().dispatch(CommandType.CLIENT, new StatusOutput<>(StringCodec.UTF8),
-                                new CommandArgs<>(StringCodec.UTF8).add(CommandKeyword.SETNAME)
-                                        .add("lettuce#MasterReplicaTopologyRefresh"));
+                        connection.async().clientSetname("lettuce#MasterReplicaTopologyRefresh");
                         sync.complete(connection);
                     }
                 });

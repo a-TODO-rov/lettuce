@@ -28,6 +28,9 @@ import io.lettuce.core.KeyValue;
 import io.lettuce.core.ScanArgs;
 import io.lettuce.core.ScanCursor;
 import io.lettuce.core.StreamScanCursor;
+import io.lettuce.core.api.sync.RedisKeyCommands;
+import io.lettuce.core.api.sync.RedisScriptingCommands;
+import io.lettuce.core.api.sync.RedisServerCommands;
 import io.lettuce.core.api.sync.RedisStringCommands;
 import io.lettuce.core.cluster.ClusterClientOptions;
 import io.lettuce.core.cluster.api.NodeSelectionSupport;
@@ -211,6 +214,28 @@ public interface RedisAdvancedClusterCommands<K, V> extends RedisClusterCommands
      * @see RedisStringCommands#mget(Object[])
      */
     List<KeyValue<K, V>> mget(K... keys);
+
+    /**
+     * Set multiple keys to multiple values with pipelining. Cross-slot keys will result in multiple calls to the particular
+     * cluster nodes.
+     *
+     * @param map the map
+     * @return String simple-string-reply always {@code OK} since {@code MSET} can't fail.
+     * @see RedisStringCommands#mset(Map)
+     */
+    String mset(Map<K, V> map);
+
+    /**
+     * Set multiple keys to multiple values, only if none of the keys exist with pipelining. Cross-slot keys will result in
+     * multiple calls to the particular cluster nodes.
+     *
+     * @param map the map
+     * @return Boolean integer-reply specifically:
+     *
+     *         {@code 1} if the all the keys were set. {@code 0} if no key was set (at least one key already existed).
+     * @see RedisStringCommands#msetnx(Map)
+     */
+    Boolean msetnx(Map<K, V> map);
 
     /**
      * Set the current connection name on all known cluster nodes with pipelining.

@@ -708,7 +708,8 @@ public class RedisClusterClient extends AbstractRedisClient {
                 commandHandlerSupplier);
 
         for (int i = 1; i < attempts; i++) {
-            result = retryOnError(result, () -> connect(socketAddressSupplier, endpoint, connection, commandHandlerSupplier));
+            result = retryOnError(result,
+                    () -> connect(socketAddressSupplier, endpoint, connection, commandHandlerSupplier));
         }
 
         return result.thenApply(c -> {
@@ -840,7 +841,8 @@ public class RedisClusterClient extends AbstractRedisClient {
                 connection, commandHandlerSupplier);
 
         for (int i = 1; i < attempts; i++) {
-            result = retryOnError(result, () -> connect(socketAddressSupplier, endpoint, connection, commandHandlerSupplier));
+            result = retryOnError(result,
+                    () -> connect(socketAddressSupplier, endpoint, connection, commandHandlerSupplier));
         }
 
         return result.thenApply(c -> {
@@ -881,8 +883,8 @@ public class RedisClusterClient extends AbstractRedisClient {
      */
     @SuppressWarnings("unchecked")
     private <K, V, T extends StatefulRedisClusterConnectionImpl<K, V>, S> ConnectionFuture<S> connectStatefulAsync(T connection,
-            DefaultEndpoint endpoint, RedisURI connectionSettings,
-            Supplier<CompletionStage<SocketAddress>> socketAddressSupplier, Supplier<CommandHandler> commandHandlerSupplier) {
+            DefaultEndpoint endpoint, RedisURI connectionSettings, Supplier<CompletionStage<SocketAddress>> socketAddressSupplier,
+            Supplier<CommandHandler> commandHandlerSupplier) {
 
         ConnectionBuilder connectionBuilder = createConnectionBuilder(connection, connection.getConnectionState(), endpoint,
                 connectionSettings, socketAddressSupplier, commandHandlerSupplier);
@@ -898,8 +900,8 @@ public class RedisClusterClient extends AbstractRedisClient {
      */
     @SuppressWarnings("unchecked")
     private <K, V, T extends StatefulRedisConnectionImpl<K, V>, S> ConnectionFuture<S> connectStatefulAsync(T connection,
-            DefaultEndpoint endpoint, RedisURI connectionSettings,
-            Supplier<CompletionStage<SocketAddress>> socketAddressSupplier, Supplier<CommandHandler> commandHandlerSupplier) {
+            DefaultEndpoint endpoint, RedisURI connectionSettings, Supplier<CompletionStage<SocketAddress>> socketAddressSupplier,
+            Supplier<CommandHandler> commandHandlerSupplier) {
 
         ConnectionBuilder connectionBuilder = createConnectionBuilder(connection, connection.getConnectionState(), endpoint,
                 connectionSettings, socketAddressSupplier, commandHandlerSupplier);
@@ -910,8 +912,8 @@ public class RedisClusterClient extends AbstractRedisClient {
     }
 
     private <K, V> ConnectionBuilder createConnectionBuilder(RedisChannelHandler<K, V> connection, ConnectionState state,
-            DefaultEndpoint endpoint, RedisURI connectionSettings,
-            Supplier<CompletionStage<SocketAddress>> socketAddressSupplier, Supplier<CommandHandler> commandHandlerSupplier) {
+            DefaultEndpoint endpoint, RedisURI connectionSettings, Supplier<CompletionStage<SocketAddress>> socketAddressSupplier,
+            Supplier<CommandHandler> commandHandlerSupplier) {
 
         ConnectionBuilder connectionBuilder;
         if (connectionSettings.isSsl()) {

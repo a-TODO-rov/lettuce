@@ -14,8 +14,6 @@ import io.lettuce.core.cluster.api.StatefulRedisClusterConnection;
 import io.lettuce.core.codec.ByteArrayCodec;
 import io.lettuce.core.codec.RedisCodec;
 import io.lettuce.core.codec.StringCodec;
-import io.lettuce.core.output.ArrayOutput;
-import io.lettuce.core.protocol.CommandType;
 import io.lettuce.core.dynamic.batch.BatchSize;
 import io.lettuce.core.dynamic.intercept.DefaultMethodInvokingInterceptor;
 import io.lettuce.core.dynamic.intercept.InvocationProxyFactory;
@@ -125,13 +123,11 @@ public class RedisCommandFactory {
         List<Object> commands = Collections.emptyList();
         try {
             if (connection instanceof StatefulRedisConnection) {
-                commands = (List<Object>) ((StatefulRedisConnection) connection).sync().dispatch(CommandType.COMMAND,
-                        new ArrayOutput<>(StringCodec.UTF8));
+                commands = ((StatefulRedisConnection) connection).sync().command();
             }
 
             if (connection instanceof StatefulRedisClusterConnection) {
-                commands = (List<Object>) ((StatefulRedisClusterConnection) connection).sync().dispatch(CommandType.COMMAND,
-                        new ArrayOutput<>(StringCodec.UTF8));
+                commands = ((StatefulRedisClusterConnection) connection).sync().command();
             }
         } catch (RedisCommandExecutionException e) {
             log.debug("Cannot obtain command metadata", e);
