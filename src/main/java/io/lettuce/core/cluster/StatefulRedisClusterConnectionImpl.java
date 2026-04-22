@@ -60,6 +60,7 @@ import io.lettuce.core.protocol.CompleteableCommand;
 import io.lettuce.core.protocol.ConnectionIntent;
 import io.lettuce.core.protocol.ConnectionWatchdog;
 import io.lettuce.core.protocol.RedisCommand;
+import io.lettuce.core.resource.ReactorProvider;
 
 
 /**
@@ -84,7 +85,11 @@ public class StatefulRedisClusterConnectionImpl<K, V> extends RedisChannelHandle
 
     protected final RedisAdvancedClusterAsyncCommandsImpl<K, V> async;
 
-    protected final RedisAdvancedClusterReactiveCommandsImpl<K, V> reactive;
+    /**
+     * Lazily initialized reactive commands - only created when reactive() is called. This avoids loading Reactor
+     * classes until they are actually needed.
+     */
+    private volatile RedisAdvancedClusterReactiveCommandsImpl<K, V> reactive;
 
     private final ClusterConnectionState connectionState = new ClusterConnectionState();
 
@@ -123,7 +128,7 @@ public class StatefulRedisClusterConnectionImpl<K, V> extends RedisChannelHandle
 
         this.async = newRedisAdvancedClusterAsyncCommandsImpl();
         this.sync = newRedisAdvancedClusterCommandsImpl();
-        this.reactive = newRedisAdvancedClusterReactiveCommandsImpl();
+        // Note: reactive commands are lazily initialized to avoid loading Reactor classes
     }
 
     @Override
@@ -164,7 +169,17 @@ public class StatefulRedisClusterConnectionImpl<K, V> extends RedisChannelHandle
 
     @Override
     public RedisAdvancedClusterReactiveCommands<K, V> reactive() {
-        return reactive;
+        ReactorProvider.checkForReactorLibrary();
+        RedisAdvancedClusterReactiveCommandsImpl<K, V> result = reactive;
+        if (result == null) {
+            synchronized (this) {
+                result = reactive;
+                if (result == null) {
+                    reactive = result = newRedisAdvancedClusterReactiveCommandsImpl();
+                }
+            }
+        }
+        return result;
     }
 
     @Override
