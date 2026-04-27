@@ -31,6 +31,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 import io.lettuce.core.annotations.Experimental;
@@ -55,7 +56,6 @@ import io.lettuce.core.sentinel.StatefulRedisSentinelConnectionImpl;
 import io.lettuce.core.sentinel.api.StatefulRedisSentinelConnection;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
-import reactor.core.publisher.Mono;
 
 /**
  * A scalable and thread-safe <a href="https://redis.io/">Redis</a> client supporting synchronous, asynchronous and reactive
@@ -525,43 +525,69 @@ public class RedisClient extends AbstractRedisClient {
         Queue<Throwable> exceptionCollector = new LinkedBlockingQueue<>();
         validateUrisAreOfSameConnectionType(sentinels);
 
-        Mono<StatefulRedisSentinelConnection<K, V>> connectionLoop = null;
+        if (sentinels.isEmpty()) {
+            CompletableFuture<StatefulRedisSentinelConnection<K, V>> failed = new CompletableFuture<>();
+            failed.completeExceptionally(
+                    new RedisConnectionException("Cannot connect to a Redis Sentinel: " + redisURI.getSentinels()));
+            return failed;
+        }
+
+        // Build a retry chain using CompletableFuture (Java 8 compatible)
+        CompletableFuture<StatefulRedisSentinelConnection<K, V>> connectionLoop = null;
 
         for (RedisURI uri : sentinels) {
-
-            Mono<StatefulRedisSentinelConnection<K, V>> connectionMono = Mono
-                    .fromCompletionStage(() -> doConnectSentinelAsync(codec, uri, timeout, new ConnectionMetadata(redisURI)))
-                    .onErrorMap(CompletionException.class, Throwable::getCause)
-                    .onErrorMap(e -> new RedisConnectionException("Cannot connect Redis Sentinel at " + uri, e))
-                    .doOnError(exceptionCollector::add);
-
             if (connectionLoop == null) {
-                connectionLoop = connectionMono;
+                connectionLoop = connectSentinelWithRetry(codec, uri, timeout, redisURI, exceptionCollector);
             } else {
-                connectionLoop = connectionLoop.onErrorResume(t -> connectionMono);
+                final CompletableFuture<StatefulRedisSentinelConnection<K, V>> previous = connectionLoop;
+                // Java 8 compatible: use handle() instead of exceptionallyCompose()
+                connectionLoop = previous.handle((result, t) -> {
+                    if (t == null) {
+                        return CompletableFuture.completedFuture(result);
+                    }
+                    return connectSentinelWithRetry(codec, uri, timeout, redisURI, exceptionCollector);
+                }).thenCompose(f -> f);
             }
         }
 
-        if (connectionLoop == null) {
-            return Mono
-                    .<StatefulRedisSentinelConnection<K, V>> error(
-                            new RedisConnectionException("Cannot connect to a Redis Sentinel: " + redisURI.getSentinels()))
-                    .toFuture();
-        }
-
-        return connectionLoop.onErrorMap(e -> {
-
+        // Java 8 compatible: use handle() instead of exceptionallyCompose()
+        return connectionLoop.handle((result, e) -> {
+            if (e == null) {
+                return CompletableFuture.completedFuture(result);
+            }
+            Throwable cause = e instanceof CompletionException ? e.getCause() : e;
             RedisConnectionException ex = new RedisConnectionException(
-                    "Cannot connect to a Redis Sentinel: " + redisURI.getSentinels(), e);
+                    "Cannot connect to a Redis Sentinel: " + redisURI.getSentinels(), cause);
 
             for (Throwable throwable : exceptionCollector) {
-                if (e != throwable) {
+                if (cause != throwable) {
                     ex.addSuppressed(throwable);
                 }
             }
 
-            return ex;
-        }).toFuture();
+            CompletableFuture<StatefulRedisSentinelConnection<K, V>> failed = new CompletableFuture<>();
+            failed.completeExceptionally(ex);
+            return failed;
+        }).thenCompose(f -> f);
+    }
+
+    private <K, V> CompletableFuture<StatefulRedisSentinelConnection<K, V>> connectSentinelWithRetry(RedisCodec<K, V> codec,
+            RedisURI uri, Duration timeout, RedisURI redisURI, Queue<Throwable> exceptionCollector) {
+
+        // Java 8 compatible: use handle() instead of exceptionallyCompose()
+        return doConnectSentinelAsync(codec, uri, timeout, new ConnectionMetadata(redisURI)).toCompletableFuture()
+                .handle((result, e) -> {
+                    if (e == null) {
+                        return CompletableFuture.completedFuture(result);
+                    }
+                    Throwable cause = e instanceof CompletionException ? e.getCause() : e;
+                    RedisConnectionException wrapped = new RedisConnectionException("Cannot connect Redis Sentinel at " + uri,
+                            cause);
+                    exceptionCollector.add(wrapped);
+                    CompletableFuture<StatefulRedisSentinelConnection<K, V>> failed = new CompletableFuture<>();
+                    failed.completeExceptionally(wrapped);
+                    return failed;
+                }).thenCompose(f -> f);
     }
 
     private <K, V> ConnectionFuture<StatefulRedisSentinelConnection<K, V>> doConnectSentinelAsync(RedisCodec<K, V> codec,
@@ -684,8 +710,8 @@ public class RedisClient extends AbstractRedisClient {
     }
 
     /**
-     * Get a {@link Mono} that resolves {@link RedisURI} to a {@link SocketAddress}. Resolution is performed either using Redis
-     * Sentinel (if the {@link RedisURI} is configured with Sentinels) or via DNS resolution.
+     * Get a {@link CompletionStage} that resolves {@link RedisURI} to a {@link SocketAddress}. Resolution is performed either
+     * using Redis Sentinel (if the {@link RedisURI} is configured with Sentinels) or via DNS resolution.
      * <p>
      * Subclasses of {@link RedisClient} may override that method.
      *
@@ -695,20 +721,21 @@ public class RedisClient extends AbstractRedisClient {
      * @see RedisURI#getSentinels()
      * @see RedisURI#getSentinelMasterId()
      */
-    protected Mono<SocketAddress> getSocketAddress(RedisURI redisURI) {
+    protected CompletionStage<SocketAddress> getSocketAddress(RedisURI redisURI) {
 
-        return Mono.defer(() -> {
-
-            if (redisURI.getSentinelMasterId() != null && !redisURI.getSentinels().isEmpty()) {
-                logger.debug("Connecting to Redis using Sentinels {}, MasterId {}", redisURI.getSentinels(),
-                        redisURI.getSentinelMasterId());
-                return lookupRedis(redisURI).switchIfEmpty(Mono.error(new RedisConnectionException(
-                        "Cannot provide redisAddress using sentinel for masterId " + redisURI.getSentinelMasterId())));
-
-            } else {
-                return Mono.fromCallable(() -> getResources().socketAddressResolver().resolve((redisURI)));
-            }
-        });
+        if (redisURI.getSentinelMasterId() != null && !redisURI.getSentinels().isEmpty()) {
+            logger.debug("Connecting to Redis using Sentinels {}, MasterId {}", redisURI.getSentinels(),
+                    redisURI.getSentinelMasterId());
+            return lookupRedis(redisURI).thenApply(addr -> {
+                if (addr == null) {
+                    throw new RedisConnectionException(
+                            "Cannot provide redisAddress using sentinel for masterId " + redisURI.getSentinelMasterId());
+                }
+                return addr;
+            });
+        } else {
+            return CompletableFuture.completedFuture(getResources().socketAddressResolver().resolve(redisURI));
+        }
     }
 
     /**
@@ -739,45 +766,57 @@ public class RedisClient extends AbstractRedisClient {
         }
     }
 
-    private Mono<SocketAddress> getSocketAddressSupplier(RedisURI redisURI) {
-        return getSocketAddress(redisURI).doOnNext(addr -> logger.debug("Resolved SocketAddress {} using {}", addr, redisURI));
+    private Supplier<CompletionStage<SocketAddress>> getSocketAddressSupplier(RedisURI redisURI) {
+        return () -> getSocketAddress(redisURI).thenApply(addr -> {
+            logger.debug("Resolved SocketAddress {} using {}", addr, redisURI);
+            return addr;
+        });
     }
 
-    private Mono<SocketAddress> lookupRedis(RedisURI sentinelUri) {
+    private CompletionStage<SocketAddress> lookupRedis(RedisURI sentinelUri) {
 
         Duration timeout = sentinelUri.getTimeout();
 
-        return Mono.usingWhen(
-                Mono.fromCompletionStage(() -> connectSentinelAsync(newStringStringCodec(), sentinelUri, timeout)), c -> {
+        return connectSentinelAsync(newStringStringCodec(), sentinelUri, timeout).thenCompose(c -> {
+            String sentinelMasterId = sentinelUri.getSentinelMasterId();
 
-                    String sentinelMasterId = sentinelUri.getSentinelMasterId();
-                    return c.reactive().getMasterAddrByName(sentinelMasterId).map(it -> {
+            CompletableFuture<SocketAddress> resultFuture = new CompletableFuture<>();
 
-                        if (it instanceof InetSocketAddress) {
+            // Schedule timeout (Java 8 compatible - no orTimeout)
+            java.util.concurrent.ScheduledFuture<?> timeoutTask = getResources().eventExecutorGroup().next().schedule(() -> {
+                if (!resultFuture.isDone()) {
+                    RedisCommandTimeoutException ex = ExceptionFactory
+                            .createTimeoutException("Cannot obtain master using SENTINEL MASTER", timeout);
+                    resultFuture.completeExceptionally(ex);
+                }
+            }, timeout.toMillis(), TimeUnit.MILLISECONDS);
 
-                            InetSocketAddress isa = (InetSocketAddress) it;
+            c.async().getMasterAddrByName(sentinelMasterId).whenComplete((addr, e) -> {
+                timeoutTask.cancel(false);
+                if (e != null) {
+                    resultFuture.completeExceptionally(e);
+                } else {
+                    try {
+                        if (addr instanceof InetSocketAddress) {
+                            InetSocketAddress isa = (InetSocketAddress) addr;
                             SocketAddress resolved = getResources().socketAddressResolver()
                                     .resolve(RedisURI.create(isa.getHostString(), isa.getPort()));
 
                             logger.debug("Resolved Master {} SocketAddress {}:{} to {}", sentinelMasterId, isa.getHostString(),
                                     isa.getPort(), resolved);
 
-                            return resolved;
+                            resultFuture.complete(resolved);
+                        } else {
+                            resultFuture.complete(addr);
                         }
+                    } catch (Exception ex) {
+                        resultFuture.completeExceptionally(ex);
+                    }
+                }
+            });
 
-                        return it;
-                    }).timeout(timeout) //
-                            .onErrorMap(e -> {
-
-                                RedisCommandTimeoutException ex = ExceptionFactory
-                                        .createTimeoutException("Cannot obtain master using SENTINEL MASTER", timeout);
-                                ex.addSuppressed(e);
-
-                                return ex;
-                            });
-                }, c -> Mono.fromCompletionStage(c::closeAsync), //
-                (c, ex) -> Mono.fromCompletionStage(c::closeAsync), //
-                c -> Mono.fromCompletionStage(c::closeAsync));
+            return resultFuture.whenComplete((result, ex) -> c.closeAsync());
+        });
     }
 
     private static <T> ConnectionFuture<T> transformAsyncConnectionException(ConnectionFuture<T> future) {

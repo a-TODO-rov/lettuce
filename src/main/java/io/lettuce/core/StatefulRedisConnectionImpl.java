@@ -42,13 +42,15 @@ import io.lettuce.core.json.JsonParser;
 import io.lettuce.core.output.MultiOutput;
 import io.lettuce.core.output.StatusOutput;
 import io.lettuce.core.protocol.*;
-import reactor.core.publisher.Mono;
+import io.lettuce.core.resource.ReactorProvider;
 
 /**
  * A thread-safe connection to a Redis server. Multiple threads may share one {@link StatefulRedisConnectionImpl}
- *
+ * <p>
  * A {@link ConnectionWatchdog} monitors each connection and reconnects automatically until {@link #close} is called. All
  * pending commands will be (re)sent after successful reconnection.
+ * <p>
+ * The reactive API requires Project Reactor (reactor-core) to be on the classpath.
  *
  * @param <K> Key type.
  * @param <V> Value type.
@@ -62,7 +64,11 @@ public class StatefulRedisConnectionImpl<K, V> extends RedisChannelHandler<K, V>
 
     protected final RedisAsyncCommandsImpl<K, V> async;
 
-    protected final RedisReactiveCommandsImpl<K, V> reactive;
+    /**
+     * Lazily initialized reactive commands - only created when reactive() is called. This avoids loading Reactor classes until
+     * they are actually needed.
+     */
+    private volatile RedisReactiveCommandsImpl<K, V> reactive;
 
     private final ConnectionState state = new ConnectionState();
 
@@ -106,7 +112,7 @@ public class StatefulRedisConnectionImpl<K, V> extends RedisChannelHandler<K, V>
         this.parser = parser;
         this.async = newRedisAsyncCommandsImpl();
         this.sync = newRedisSyncCommandsImpl();
-        this.reactive = newRedisReactiveCommandsImpl();
+        // Note: reactive commands are lazily initialized to avoid loading Reactor classes
     }
 
     @Override
@@ -137,9 +143,25 @@ public class StatefulRedisConnectionImpl<K, V> extends RedisChannelHandler<K, V>
         return new RedisAsyncCommandsImpl<>(this, codec, parser);
     }
 
-    @Override
+    /**
+     * Returns the {@link RedisReactiveCommands} API for the current connection. Does not create a new connection.
+     * <p>
+     * Prefer using {@link RedisReactiveCommands#from(StatefulRedisConnection)} to obtain the reactive API.
+     *
+     * @return the reactive API for the underlying connection.
+     */
     public RedisReactiveCommands<K, V> reactive() {
-        return reactive;
+        ReactorProvider.checkForReactorLibrary();
+        RedisReactiveCommandsImpl<K, V> result = reactive;
+        if (result == null) {
+            synchronized (this) {
+                result = reactive;
+                if (result == null) {
+                    reactive = result = newRedisReactiveCommandsImpl();
+                }
+            }
+        }
+        return result;
     }
 
     /**

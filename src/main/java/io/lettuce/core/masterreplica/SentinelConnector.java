@@ -25,7 +25,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 
-import reactor.core.publisher.Mono;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisException;
 import io.lettuce.core.RedisURI;
@@ -71,17 +70,25 @@ class SentinelConnector<K, V> implements MasterReplicaConnector<K, V> {
 
         Runnable runnable = getTopologyRefreshRunnable(refresh, connectionProvider);
 
-        return refresh.getNodes(redisURI).flatMap(nodes -> {
+        return refresh.getNodes(redisURI).thenCompose(nodes -> {
 
             if (nodes.isEmpty()) {
-                return Mono.error(new RedisException(String.format("Cannot determine topology from %s", redisURI)));
+                CompletableFuture<StatefulRedisMasterReplicaConnection<K, V>> failed = new CompletableFuture<>();
+                failed.completeExceptionally(new RedisException(String.format("Cannot determine topology from %s", redisURI)));
+                return failed;
             }
 
             return initializeConnection(codec, sentinelTopologyRefresh, connectionProvider, runnable, nodes);
-        }).onErrorMap(ExecutionException.class, Throwable::getCause).toFuture();
+        }).handle((result, t) -> {
+            if (t != null) {
+                Throwable cause = t instanceof ExecutionException ? t.getCause() : t;
+                throw new java.util.concurrent.CompletionException(cause);
+            }
+            return result;
+        });
     }
 
-    private Mono<StatefulRedisMasterReplicaConnection<K, V>> initializeConnection(RedisCodec<K, V> codec,
+    private CompletableFuture<StatefulRedisMasterReplicaConnection<K, V>> initializeConnection(RedisCodec<K, V> codec,
             SentinelTopologyRefresh sentinelTopologyRefresh, MasterReplicaConnectionProvider<K, V> connectionProvider,
             Runnable runnable, List<RedisNodeDescription> nodes) {
 
@@ -103,9 +110,12 @@ class SentinelConnector<K, V> implements MasterReplicaConnector<K, V> {
 
         CompletionStage<Void> bind = sentinelTopologyRefresh.bind(runnable);
 
-        return Mono.fromCompletionStage(bind).onErrorResume(t -> {
-            return ResumeAfter.close(connection).thenError(t);
-        }).then(Mono.just(connection));
+        return bind.toCompletableFuture().handle((v, t) -> {
+            if (t != null) {
+                return ResumeAfter.close(connection).<StatefulRedisMasterReplicaConnection<K, V>> thenError(t);
+            }
+            return CompletableFuture.<StatefulRedisMasterReplicaConnection<K, V>> completedFuture(connection);
+        }).thenCompose(java.util.function.Function.identity());
     }
 
     private Runnable getTopologyRefreshRunnable(MasterReplicaTopologyRefresh refresh,
@@ -115,7 +125,12 @@ class SentinelConnector<K, V> implements MasterReplicaConnector<K, V> {
             try {
 
                 LOG.debug("Refreshing topology");
-                refresh.getNodes(redisURI).subscribe(nodes -> {
+                refresh.getNodes(redisURI).whenComplete((nodes, t) -> {
+
+                    if (t != null) {
+                        LOG.error("Error during background refresh", t);
+                        return;
+                    }
 
                     EventRecorder.getInstance().record(new MasterReplicaTopologyChangedEvent(redisURI, nodes));
 
@@ -125,8 +140,7 @@ class SentinelConnector<K, V> implements MasterReplicaConnector<K, V> {
 
                     LOG.debug("New topology: {}", nodes);
                     connectionProvider.setKnownNodes(nodes);
-
-                }, t -> LOG.error("Error during background refresh", t));
+                });
 
             } catch (Exception e) {
                 LOG.error("Error during background refresh", e);

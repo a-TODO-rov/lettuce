@@ -1,9 +1,11 @@
 package io.lettuce.core;
 
+import java.io.Closeable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 import io.lettuce.core.internal.LettuceAssert;
 
 /**
@@ -11,7 +13,10 @@ import io.lettuce.core.internal.LettuceAssert;
  * {@link StaticCredentialsProvider} for a fixed set of credentials.
  * <p>
  * Credentials are requested by the driver after connecting to the server. Therefore, credential retrieval is subject to
- * complete within the connection creation timeout to avoid connection failures.
+ * complete within the configured connection creation timeout to avoid connection failures.
+ * <p>
+ * Since 7.0 this interface is Reactor-free. Implementations that want to expose credentials through Project Reactor types
+ * ({@code Mono}/{@code Flux}) should implement {@link ReactiveRedisCredentialsProvider} instead, which extends this interface.
  *
  * @author Mark Paluch
  * @since 6.2
@@ -25,9 +30,10 @@ public interface RedisCredentialsProvider {
      * might load credentials from an existing key management system, or load new credentials when credentials are rotated. If
      * an error occurs during the loading of credentials or credentials could not be found, a runtime exception will be raised.
      *
-     * @return a {@link Mono} emitting {@link RedisCredentials} that can be used to authorize a Redis connection.
+     * @return a {@link CompletionStage} emitting {@link RedisCredentials} that can be used to authorize a Redis connection.
+     * @since 7.0
      */
-    Mono<RedisCredentials> resolveCredentials();
+    CompletionStage<RedisCredentials> resolveCredentialsAsync();
 
     /**
      * Creates a new {@link RedisCredentialsProvider} from a given {@link Supplier}.
@@ -39,14 +45,14 @@ public interface RedisCredentialsProvider {
 
         LettuceAssert.notNull(supplier, "Supplier must not be null");
 
-        return () -> Mono.fromSupplier(supplier);
+        return () -> CompletableFuture.completedFuture(supplier.get());
     }
 
     /**
      * Some implementations of the {@link RedisCredentialsProvider} may support streaming new credentials, based on some event
      * that originates outside the driver. In this case they should indicate that so the {@link RedisAuthenticationHandler} is
      * able to process these new credentials.
-     * 
+     *
      * @return whether the {@link RedisCredentialsProvider} supports streaming credentials.
      */
     default boolean supportsStreaming() {
@@ -54,19 +60,19 @@ public interface RedisCredentialsProvider {
     }
 
     /**
-     * Returns a {@link Flux} emitting {@link RedisCredentials} that can be used to authorize a Redis connection.
-     *
-     * For implementations that support streaming credentials (as indicated by {@link #supportsStreaming()} returning
-     * {@code true}), this method can emit multiple credentials over time, typically based on external events like token renewal
-     * or rotation.
-     *
+     * Subscribes to a stream of {@link RedisCredentials} updates. For implementations that support streaming credentials (as
+     * indicated by {@link #supportsStreaming()} returning {@code true}), the provided {@code listener} is invoked whenever new
+     * credentials become available, typically based on external events like token renewal or rotation.
+     * <p>
      * For implementations that do not support streaming credentials (where {@link #supportsStreaming()} returns {@code false}),
      * this method throws an {@link UnsupportedOperationException} by default.
      *
-     * @return a {@link Flux} emitting {@link RedisCredentials}, or throws an exception if streaming is not supported.
+     * @param listener the consumer that accepts newly emitted credentials. Must not be {@code null}.
+     * @return a {@link Closeable} that can be used to cancel the subscription.
      * @throws UnsupportedOperationException if the provider does not support streaming credentials.
+     * @since 7.0
      */
-    default Flux<RedisCredentials> credentials() {
+    default Closeable subscribeToCredentials(Consumer<RedisCredentials> listener) {
         throw new UnsupportedOperationException("Streaming credentials are not supported by this provider.");
     }
 
@@ -78,8 +84,8 @@ public interface RedisCredentialsProvider {
     interface ImmediateRedisCredentialsProvider extends RedisCredentialsProvider {
 
         @Override
-        default Mono<RedisCredentials> resolveCredentials() {
-            return Mono.just(resolveCredentialsNow());
+        default CompletionStage<RedisCredentials> resolveCredentialsAsync() {
+            return CompletableFuture.completedFuture(resolveCredentialsNow());
         }
 
         /**

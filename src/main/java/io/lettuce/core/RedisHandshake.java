@@ -210,9 +210,8 @@ class RedisHandshake implements ConnectionInitializer {
                     ((RedisCredentialsProvider.ImmediateRedisCredentialsProvider) credentialsProvider).resolveCredentialsNow());
         }
 
-        CompletableFuture<RedisCredentials> credentialsFuture = credentialsProvider.resolveCredentials().toFuture();
-
-        return credentialsFuture.thenComposeAsync(credentials -> dispatchAuthOrPing(channel, credentials));
+        throw new UnsupportedOperationException(
+                "Non-immediate RedisCredentialsProvider requires reactor-core on the classpath");
     }
 
     private CompletableFuture<String> dispatchAuthOrPing(Channel channel, RedisCredentials credentials) {
@@ -243,9 +242,8 @@ class RedisHandshake implements ConnectionInitializer {
                     ((RedisCredentialsProvider.ImmediateRedisCredentialsProvider) credentialsProvider).resolveCredentialsNow());
         }
 
-        CompletableFuture<RedisCredentials> credentialsFuture = credentialsProvider.resolveCredentials().toFuture();
-
-        return credentialsFuture.thenComposeAsync(credentials -> dispatchHello(channel, credentials));
+        throw new UnsupportedOperationException(
+                "Non-immediate RedisCredentialsProvider requires reactor-core on the classpath");
     }
 
     private AsyncCommand<String, String, Map<String, Object>> dispatchHello(Channel channel, RedisCredentials credentials) {

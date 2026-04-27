@@ -5,6 +5,7 @@ import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 import io.lettuce.core.api.reactive.RedisReactiveCommands;
 import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
+import io.lettuce.core.pubsub.StatefulRedisPubSubConnectionImpl;
 
 /**
  * Asynchronous and thread-safe Redis PubSub API.
@@ -123,5 +124,24 @@ public interface RedisPubSubReactiveCommands<K, V> extends RedisReactiveCommands
      */
     @Deprecated
     StatefulRedisPubSubConnection<K, V> getStatefulConnection();
+
+    /**
+     * Returns the {@link RedisPubSubReactiveCommands} API for the given connection. Requires {@code reactor-core} on the
+     * classpath.
+     *
+     * @param connection the stateful PubSub connection, must not be {@code null}.
+     * @param <K> Key type.
+     * @param <V> Value type.
+     * @return the reactive PubSub API for the underlying connection.
+     * @since 7.0
+     */
+    @SuppressWarnings("unchecked")
+    static <K, V> RedisPubSubReactiveCommands<K, V> from(StatefulRedisPubSubConnection<K, V> connection) {
+        if (connection instanceof StatefulRedisPubSubConnectionImpl) {
+            return ((StatefulRedisPubSubConnectionImpl<K, V>) connection).reactive();
+        }
+        throw new UnsupportedOperationException(
+                "Connection of type " + connection.getClass().getName() + " does not support the reactive PubSub API.");
+    }
 
 }

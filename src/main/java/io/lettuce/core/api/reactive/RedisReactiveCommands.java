@@ -19,6 +19,7 @@
  */
 package io.lettuce.core.api.reactive;
 
+import io.lettuce.core.StatefulRedisConnectionImpl;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.cluster.api.reactive.RedisClusterReactiveCommands;
 import reactor.core.publisher.Mono;
@@ -81,5 +82,23 @@ public interface RedisReactiveCommands<K, V> extends BaseRedisReactiveCommands<K
      */
     @Deprecated
     StatefulRedisConnection<K, V> getStatefulConnection();
+
+    /**
+     * Returns the {@link RedisReactiveCommands} API for the given connection. Requires {@code reactor-core} on the classpath.
+     *
+     * @param connection the stateful Redis connection, must not be {@code null}.
+     * @param <K> Key type.
+     * @param <V> Value type.
+     * @return the reactive API for the underlying connection.
+     * @since 7.0
+     */
+    @SuppressWarnings("unchecked")
+    static <K, V> RedisReactiveCommands<K, V> from(StatefulRedisConnection<K, V> connection) {
+        if (connection instanceof StatefulRedisConnectionImpl) {
+            return ((StatefulRedisConnectionImpl<K, V>) connection).reactive();
+        }
+        throw new UnsupportedOperationException("Connection of type " + connection.getClass().getName()
+                + " does not support the reactive API. Use a StatefulRedisConnectionImpl or a known subclass.");
+    }
 
 }

@@ -5,8 +5,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisConnectionException;
 import io.lettuce.core.RedisURI;
@@ -61,48 +59,52 @@ class StaticMasterReplicaTopologyProvider implements TopologyProvider {
     @Override
     public CompletableFuture<List<RedisNodeDescription>> getNodesAsync() {
 
-        List<StatefulRedisConnection<String, String>> connections = new CopyOnWriteArrayList<>();
+        List<CompletableFuture<RedisNodeDescription>> nodeFutures = new CopyOnWriteArrayList<>();
 
-        Flux<RedisURI> uris = Flux.fromIterable(redisURIs);
-        Mono<List<RedisNodeDescription>> nodes = uris.flatMap(uri -> getNodeDescription(connections, uri)).collectList()
-                .flatMap((nodeDescriptions) -> {
+        for (RedisURI uri : redisURIs) {
+            nodeFutures.add(getNodeDescription(uri));
+        }
 
-                    if (nodeDescriptions.isEmpty()) {
-                        return Mono.error(new RedisConnectionException(
-                                String.format("Failed to connect to at least one node in %s", redisURIs)));
-                    }
+        CompletableFuture<?>[] arr = nodeFutures.toArray(new CompletableFuture[0]);
+        return CompletableFuture.allOf(arr).thenApply(v -> {
 
-                    return Mono.just(nodeDescriptions);
-                });
+            List<RedisNodeDescription> nodeDescriptions = new CopyOnWriteArrayList<>();
+            for (CompletableFuture<RedisNodeDescription> f : nodeFutures) {
+                RedisNodeDescription node = f.join();
+                if (node != null) {
+                    nodeDescriptions.add(node);
+                }
+            }
 
-        return nodes.toFuture();
+            if (nodeDescriptions.isEmpty()) {
+                throw new RedisConnectionException(String.format("Failed to connect to at least one node in %s", redisURIs));
+            }
+
+            return (List<RedisNodeDescription>) nodeDescriptions;
+        });
     }
 
-    private Mono<RedisNodeDescription> getNodeDescription(List<StatefulRedisConnection<String, String>> connections,
-            RedisURI uri) {
+    private CompletableFuture<RedisNodeDescription> getNodeDescription(RedisURI uri) {
 
-        return Mono.fromCompletionStage(redisClient.connectAsync(StringCodec.UTF8, uri)) //
-                .onErrorResume(t -> {
-
-                    logger.warn("Cannot connect to {}", uri, t);
-                    return Mono.empty();
-                }) //
-                .doOnNext(connections::add) //
-                .flatMap(connection -> {
-
-                    Mono<RedisNodeDescription> instance = getNodeDescription(uri, connection);
-
-                    return instance.flatMap(it -> ResumeAfter.close(connection).thenEmit(it)).doFinally(s -> {
-                        connections.remove(connection);
-                    });
-                });
+        return redisClient.connectAsync(StringCodec.UTF8, uri).toCompletableFuture().thenCompose(connection -> {
+            return getNodeDescription(uri, connection).thenCompose(it -> ResumeAfter.close(connection).thenEmit(it));
+        }).handle((result, t) -> {
+            if (t != null) {
+                logger.warn("Cannot connect to {}", uri, t);
+                return null;
+            }
+            return result;
+        });
     }
 
-    private static Mono<RedisNodeDescription> getNodeDescription(RedisURI uri,
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    private static CompletableFuture<RedisNodeDescription> getNodeDescription(RedisURI uri,
             StatefulRedisConnection<String, String> connection) {
 
-        return connection.reactive().role().collectList().map(RoleParser::parse)
-                .map(it -> new RedisMasterReplicaNode(uri.getHost(), uri.getPort(), uri, it.getRole()));
+        return connection.async().role().toCompletableFuture().thenApply(roleOutputs -> {
+            return (RedisNodeDescription) new RedisMasterReplicaNode(uri.getHost(), uri.getPort(), uri,
+                    RoleParser.parse(roleOutputs).getRole());
+        });
     }
 
 }

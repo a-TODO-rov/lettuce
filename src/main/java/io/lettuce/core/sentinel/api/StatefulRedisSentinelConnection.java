@@ -3,7 +3,6 @@ package io.lettuce.core.sentinel.api;
 import io.lettuce.core.api.StatefulConnection;
 import io.lettuce.core.protocol.ConnectionWatchdog;
 import io.lettuce.core.sentinel.api.async.RedisSentinelAsyncCommands;
-import io.lettuce.core.sentinel.api.reactive.RedisSentinelReactiveCommands;
 import io.lettuce.core.sentinel.api.sync.RedisSentinelCommands;
 
 /**
@@ -32,12 +31,5 @@ public interface StatefulRedisSentinelConnection<K, V> extends StatefulConnectio
      * @return the asynchronous API for the underlying connection.
      */
     RedisSentinelAsyncCommands<K, V> async();
-
-    /**
-     * Returns the {@link RedisSentinelReactiveCommands} API for the current connection. Does not create a new connection.
-     *
-     * @return the reactive API for the underlying connection.
-     */
-    RedisSentinelReactiveCommands<K, V> reactive();
 
 }

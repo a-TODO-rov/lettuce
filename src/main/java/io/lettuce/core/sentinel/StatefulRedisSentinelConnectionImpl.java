@@ -31,6 +31,7 @@ import io.lettuce.core.codec.StringCodec;
 import io.lettuce.core.json.JsonParser;
 import io.lettuce.core.output.StatusOutput;
 import io.lettuce.core.protocol.*;
+import io.lettuce.core.resource.ReactorProvider;
 import io.lettuce.core.sentinel.api.StatefulRedisSentinelConnection;
 import io.lettuce.core.sentinel.api.async.RedisSentinelAsyncCommands;
 import io.lettuce.core.sentinel.api.reactive.RedisSentinelReactiveCommands;
@@ -50,7 +51,13 @@ public class StatefulRedisSentinelConnectionImpl<K, V> extends RedisChannelHandl
 
     protected final RedisSentinelAsyncCommands<K, V> async;
 
-    protected final RedisSentinelReactiveCommands<K, V> reactive;
+    /**
+     * Lazily initialized reactive commands - only created when {@link #reactive()} is called. This avoids loading Reactor
+     * classes until the reactive API is explicitly used.
+     */
+    private volatile RedisSentinelReactiveCommandsImpl<K, V> reactive;
+
+    private final Supplier<JsonParser> parser;
 
     private final SentinelConnectionState connectionState = new SentinelConnectionState();
 
@@ -79,9 +86,10 @@ public class StatefulRedisSentinelConnectionImpl<K, V> extends RedisChannelHandl
         super(writer, timeout);
 
         this.codec = codec;
+        this.parser = parser;
         this.async = new RedisSentinelAsyncCommandsImpl<>(this, codec);
         this.sync = syncHandler(async, RedisSentinelCommands.class);
-        this.reactive = new RedisSentinelReactiveCommandsImpl<>(this, codec, parser);
+        // Note: reactive commands are lazily initialized to avoid loading Reactor classes
     }
 
     @Override
@@ -104,9 +112,22 @@ public class StatefulRedisSentinelConnectionImpl<K, V> extends RedisChannelHandl
         return async;
     }
 
-    @Override
+    protected RedisSentinelReactiveCommandsImpl<K, V> newRedisSentinelReactiveCommandsImpl() {
+        return new RedisSentinelReactiveCommandsImpl<>(this, codec, parser);
+    }
+
     public RedisSentinelReactiveCommands<K, V> reactive() {
-        return reactive;
+        ReactorProvider.checkForReactorLibrary();
+        RedisSentinelReactiveCommandsImpl<K, V> result = reactive;
+        if (result == null) {
+            synchronized (this) {
+                result = reactive;
+                if (result == null) {
+                    reactive = result = newRedisSentinelReactiveCommandsImpl();
+                }
+            }
+        }
+        return result;
     }
 
     /**

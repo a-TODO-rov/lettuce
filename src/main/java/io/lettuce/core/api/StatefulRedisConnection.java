@@ -2,7 +2,6 @@ package io.lettuce.core.api;
 
 import io.lettuce.core.api.async.RedisAsyncCommands;
 import io.lettuce.core.api.push.PushListener;
-import io.lettuce.core.api.reactive.RedisReactiveCommands;
 import io.lettuce.core.api.sync.RedisCommands;
 import io.lettuce.core.protocol.ConnectionWatchdog;
 
@@ -38,13 +37,6 @@ public interface StatefulRedisConnection<K, V> extends StatefulConnection<K, V> 
      * @return the asynchronous API for the underlying connection.
      */
     RedisAsyncCommands<K, V> async();
-
-    /**
-     * Returns the {@link RedisReactiveCommands} API for the current connection. Does not create a new connection.
-     *
-     * @return the reactive API for the underlying connection.
-     */
-    RedisReactiveCommands<K, V> reactive();
 
     /**
      * Add a new {@link PushListener listener} to consume push messages.

@@ -35,6 +35,7 @@ import io.lettuce.core.api.reactive.RedisScriptingReactiveCommands;
 import io.lettuce.core.api.reactive.RedisServerReactiveCommands;
 import io.lettuce.core.api.reactive.RedisStringReactiveCommands;
 import io.lettuce.core.cluster.ClusterClientOptions;
+import io.lettuce.core.cluster.StatefulRedisClusterConnectionImpl;
 import io.lettuce.core.cluster.api.StatefulRedisClusterConnection;
 import io.lettuce.core.output.KeyStreamingChannel;
 
@@ -367,5 +368,24 @@ public interface RedisAdvancedClusterReactiveCommands<K, V> extends RedisCluster
      * @return Long integer-reply the number of found keys.
      */
     Mono<Long> touch(K... keys);
+
+    /**
+     * Returns the {@link RedisAdvancedClusterReactiveCommands} API for the given connection. Requires {@code reactor-core} on
+     * the classpath.
+     *
+     * @param connection the stateful cluster connection, must not be {@code null}.
+     * @param <K> Key type.
+     * @param <V> Value type.
+     * @return the reactive cluster API for the underlying connection.
+     * @since 7.0
+     */
+    @SuppressWarnings("unchecked")
+    static <K, V> RedisAdvancedClusterReactiveCommands<K, V> from(StatefulRedisClusterConnection<K, V> connection) {
+        if (connection instanceof StatefulRedisClusterConnectionImpl) {
+            return ((StatefulRedisClusterConnectionImpl<K, V>) connection).reactive();
+        }
+        throw new UnsupportedOperationException(
+                "Connection of type " + connection.getClass().getName() + " does not support the reactive cluster API.");
+    }
 
 }

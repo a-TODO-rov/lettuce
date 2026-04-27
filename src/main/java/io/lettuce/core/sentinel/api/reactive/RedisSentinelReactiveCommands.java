@@ -27,6 +27,7 @@ import io.lettuce.core.KillArgs;
 import io.lettuce.core.output.CommandOutput;
 import io.lettuce.core.protocol.CommandArgs;
 import io.lettuce.core.protocol.ProtocolKeyword;
+import io.lettuce.core.sentinel.StatefulRedisSentinelConnectionImpl;
 import io.lettuce.core.sentinel.api.StatefulRedisSentinelConnection;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -253,5 +254,24 @@ public interface RedisSentinelReactiveCommands<K, V> {
      * @return the underlying connection.
      */
     StatefulRedisSentinelConnection<K, V> getStatefulConnection();
+
+    /**
+     * Returns the {@link RedisSentinelReactiveCommands} API for the given connection. Requires {@code reactor-core} on the
+     * classpath.
+     *
+     * @param connection the stateful Sentinel connection, must not be {@code null}.
+     * @param <K> Key type.
+     * @param <V> Value type.
+     * @return the reactive Sentinel API for the underlying connection.
+     * @since 7.0
+     */
+    @SuppressWarnings("unchecked")
+    static <K, V> RedisSentinelReactiveCommands<K, V> from(StatefulRedisSentinelConnection<K, V> connection) {
+        if (connection instanceof StatefulRedisSentinelConnectionImpl) {
+            return ((StatefulRedisSentinelConnectionImpl<K, V>) connection).reactive();
+        }
+        throw new UnsupportedOperationException(
+                "Connection of type " + connection.getClass().getName() + " does not support the reactive Sentinel API.");
+    }
 
 }

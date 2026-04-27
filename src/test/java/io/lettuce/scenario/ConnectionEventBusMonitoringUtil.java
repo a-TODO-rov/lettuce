@@ -10,7 +10,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import io.lettuce.core.RedisClient;
+import io.lettuce.core.event.Event;
 import io.lettuce.core.event.EventBus;
+import io.lettuce.core.event.ReactorNotAvailableException;
 import io.lettuce.core.event.connection.ConnectedEvent;
 import io.lettuce.core.event.connection.ConnectionActivatedEvent;
 import io.lettuce.core.event.connection.ConnectionDeactivatedEvent;
@@ -40,47 +42,55 @@ public class ConnectionEventBusMonitoringUtil {
     public void setupEventBusMonitoring(RedisClient client) {
         EventBus eventBus = client.getResources().eventBus();
 
-        eventBus.get().subscribe(event -> {
-            if (!monitoringActive.get())
-                return;
+        // Try reactive subscription, fallback to callback if Reactor not available
+        try {
+            eventBus.reactive().get().subscribe(this::handleEvent);
+            log.info("EventBus monitoring setup completed (reactive)");
+        } catch (ReactorNotAvailableException e) {
+            eventBus.subscribe(this::handleEvent);
+            log.info("EventBus monitoring setup completed (callback)");
+        }
+    }
 
-            if (event instanceof ConnectedEvent) {
-                ConnectedEvent connected = (ConnectedEvent) event;
-                String channelId = getChannelIdFromEvent(connected);
-                connectedChannels.add(channelId);
-                log.info("EventBus: Channel connected - {}", channelId);
+    private void handleEvent(Event event) {
+        if (!monitoringActive.get()) {
+            return;
+        }
+
+        if (event instanceof ConnectedEvent) {
+            ConnectedEvent connected = (ConnectedEvent) event;
+            String channelId = getChannelIdFromEvent(connected);
+            connectedChannels.add(channelId);
+            log.info("EventBus: Channel connected - {}", channelId);
+        }
+
+        if (event instanceof ConnectionActivatedEvent) {
+            ConnectionActivatedEvent activated = (ConnectionActivatedEvent) event;
+            String channelId = getChannelIdFromEvent(activated);
+            activatedChannels.add(channelId);
+            currentChannelId.set(channelId);
+            log.info("EventBus: Connection activated - {}", channelId);
+        }
+
+        if (event instanceof DisconnectedEvent) {
+            DisconnectedEvent disconnected = (DisconnectedEvent) event;
+            String channelId = getChannelIdFromEvent(disconnected);
+            disconnectedChannels.add(channelId);
+            if (connectionTransitionLatch != null) {
+                connectionTransitionLatch.countDown();
             }
+            log.info("EventBus: Channel disconnected - {}", channelId);
+        }
 
-            if (event instanceof ConnectionActivatedEvent) {
-                ConnectionActivatedEvent activated = (ConnectionActivatedEvent) event;
-                String channelId = getChannelIdFromEvent(activated);
-                activatedChannels.add(channelId);
-                currentChannelId.set(channelId);
-                log.info("EventBus: Connection activated - {}", channelId);
+        if (event instanceof ConnectionDeactivatedEvent) {
+            ConnectionDeactivatedEvent deactivated = (ConnectionDeactivatedEvent) event;
+            String channelId = getChannelIdFromEvent(deactivated);
+            deactivatedChannels.add(channelId);
+            if (connectionTransitionLatch != null) {
+                connectionTransitionLatch.countDown();
             }
-
-            if (event instanceof DisconnectedEvent) {
-                DisconnectedEvent disconnected = (DisconnectedEvent) event;
-                String channelId = getChannelIdFromEvent(disconnected);
-                disconnectedChannels.add(channelId);
-                if (connectionTransitionLatch != null) {
-                    connectionTransitionLatch.countDown();
-                }
-                log.info("EventBus: Channel disconnected - {}", channelId);
-            }
-
-            if (event instanceof ConnectionDeactivatedEvent) {
-                ConnectionDeactivatedEvent deactivated = (ConnectionDeactivatedEvent) event;
-                String channelId = getChannelIdFromEvent(deactivated);
-                deactivatedChannels.add(channelId);
-                if (connectionTransitionLatch != null) {
-                    connectionTransitionLatch.countDown();
-                }
-                log.info("EventBus: Connection deactivated - {}", channelId);
-            }
-        });
-
-        log.info("EventBus monitoring setup completed");
+            log.info("EventBus: Connection deactivated - {}", channelId);
+        }
     }
 
     private String getChannelIdFromEvent(Object event) {
