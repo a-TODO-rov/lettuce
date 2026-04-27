@@ -109,8 +109,8 @@ public interface RedisClusterPubSubReactiveCommands<K, V> extends RedisPubSubRea
     PubSubReactiveNodeSelection<K, V> nodes(Predicate<RedisClusterNode> predicate);
 
     /**
-     * Returns the {@link RedisClusterPubSubReactiveCommands} API for the given connection. Requires {@code reactor-core} on
-     * the classpath.
+     * Returns the {@link RedisClusterPubSubReactiveCommands} API for the given connection. Requires {@code reactor-core} on the
+     * classpath.
      *
      * @param connection the stateful cluster PubSub connection, must not be {@code null}.
      * @param <K> Key type.
@@ -123,8 +123,8 @@ public interface RedisClusterPubSubReactiveCommands<K, V> extends RedisPubSubRea
         if (connection instanceof StatefulRedisPubSubConnectionImpl) {
             return (RedisClusterPubSubReactiveCommands<K, V>) ((StatefulRedisPubSubConnectionImpl<K, V>) connection).reactive();
         }
-        throw new UnsupportedOperationException("Connection of type " + connection.getClass().getName()
-                + " does not support the reactive cluster PubSub API.");
+        throw new UnsupportedOperationException(
+                "Connection of type " + connection.getClass().getName() + " does not support the reactive cluster PubSub API.");
     }
 
 }

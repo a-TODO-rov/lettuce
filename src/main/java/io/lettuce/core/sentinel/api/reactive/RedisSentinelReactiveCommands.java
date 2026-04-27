@@ -270,8 +270,8 @@ public interface RedisSentinelReactiveCommands<K, V> {
         if (connection instanceof StatefulRedisSentinelConnectionImpl) {
             return ((StatefulRedisSentinelConnectionImpl<K, V>) connection).reactive();
         }
-        throw new UnsupportedOperationException("Connection of type " + connection.getClass().getName()
-                + " does not support the reactive Sentinel API.");
+        throw new UnsupportedOperationException(
+                "Connection of type " + connection.getClass().getName() + " does not support the reactive Sentinel API.");
     }
 
 }

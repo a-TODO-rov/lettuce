@@ -32,5 +32,4 @@ public interface StatefulRedisSentinelConnection<K, V> extends StatefulConnectio
      */
     RedisSentinelAsyncCommands<K, V> async();
 
-
 }

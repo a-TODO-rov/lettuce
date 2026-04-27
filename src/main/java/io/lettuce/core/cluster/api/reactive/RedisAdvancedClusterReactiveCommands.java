@@ -384,8 +384,8 @@ public interface RedisAdvancedClusterReactiveCommands<K, V> extends RedisCluster
         if (connection instanceof StatefulRedisClusterConnectionImpl) {
             return ((StatefulRedisClusterConnectionImpl<K, V>) connection).reactive();
         }
-        throw new UnsupportedOperationException("Connection of type " + connection.getClass().getName()
-                + " does not support the reactive cluster API.");
+        throw new UnsupportedOperationException(
+                "Connection of type " + connection.getClass().getName() + " does not support the reactive cluster API.");
     }
 
 }

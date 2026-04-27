@@ -74,8 +74,7 @@ class SentinelConnector<K, V> implements MasterReplicaConnector<K, V> {
 
             if (nodes.isEmpty()) {
                 CompletableFuture<StatefulRedisMasterReplicaConnection<K, V>> failed = new CompletableFuture<>();
-                failed.completeExceptionally(
-                        new RedisException(String.format("Cannot determine topology from %s", redisURI)));
+                failed.completeExceptionally(new RedisException(String.format("Cannot determine topology from %s", redisURI)));
                 return failed;
             }
 
@@ -113,8 +112,7 @@ class SentinelConnector<K, V> implements MasterReplicaConnector<K, V> {
 
         return bind.toCompletableFuture().handle((v, t) -> {
             if (t != null) {
-                return ResumeAfter.close(connection)
-                        .<StatefulRedisMasterReplicaConnection<K, V>> thenError(t);
+                return ResumeAfter.close(connection).<StatefulRedisMasterReplicaConnection<K, V>> thenError(t);
             }
             return CompletableFuture.<StatefulRedisMasterReplicaConnection<K, V>> completedFuture(connection);
         }).thenCompose(java.util.function.Function.identity());

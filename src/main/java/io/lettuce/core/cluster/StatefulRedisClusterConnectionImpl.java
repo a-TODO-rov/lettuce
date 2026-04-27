@@ -62,7 +62,6 @@ import io.lettuce.core.protocol.ConnectionWatchdog;
 import io.lettuce.core.protocol.RedisCommand;
 import io.lettuce.core.resource.ReactorProvider;
 
-
 /**
  * A thread-safe connection to a Redis Cluster. Multiple threads may share one {@link StatefulRedisClusterConnectionImpl}
  *
@@ -86,8 +85,8 @@ public class StatefulRedisClusterConnectionImpl<K, V> extends RedisChannelHandle
     protected final RedisAdvancedClusterAsyncCommandsImpl<K, V> async;
 
     /**
-     * Lazily initialized reactive commands - only created when reactive() is called. This avoids loading Reactor
-     * classes until they are actually needed.
+     * Lazily initialized reactive commands - only created when reactive() is called. This avoids loading Reactor classes until
+     * they are actually needed.
      */
     private volatile RedisAdvancedClusterReactiveCommandsImpl<K, V> reactive;
 

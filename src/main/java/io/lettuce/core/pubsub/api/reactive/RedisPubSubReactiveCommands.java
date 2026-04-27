@@ -140,8 +140,8 @@ public interface RedisPubSubReactiveCommands<K, V> extends RedisReactiveCommands
         if (connection instanceof StatefulRedisPubSubConnectionImpl) {
             return ((StatefulRedisPubSubConnectionImpl<K, V>) connection).reactive();
         }
-        throw new UnsupportedOperationException("Connection of type " + connection.getClass().getName()
-                + " does not support the reactive PubSub API.");
+        throw new UnsupportedOperationException(
+                "Connection of type " + connection.getClass().getName() + " does not support the reactive PubSub API.");
     }
 
 }

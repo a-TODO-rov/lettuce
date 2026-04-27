@@ -9,8 +9,8 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
- * Extension of {@link RedisCredentialsProvider} that exposes credentials through Project Reactor types
- * ({@link Mono} and {@link Flux}).
+ * Extension of {@link RedisCredentialsProvider} that exposes credentials through Project Reactor types ({@link Mono} and
+ * {@link Flux}).
  * <p>
  * Implementations of this interface provide credentials reactively. The base {@link RedisCredentialsProvider} API
  * ({@link #resolveCredentialsAsync()} and {@link #subscribeToCredentials(Consumer)}) is bridged to the reactive methods by

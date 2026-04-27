@@ -68,8 +68,7 @@ class MasterReplicaTopologyRefresh {
                     CompletionStage<List<RedisNodeDescription>> nodes = requests.getOrTimeout(seed.getTimeout(),
                             eventExecutors);
 
-                    return nodes.toCompletableFuture()
-                            .thenCompose(it -> ResumeAfter.close(connections).thenEmit(it));
+                    return nodes.toCompletableFuture().thenCompose(it -> ResumeAfter.close(connections).thenEmit(it));
                 });
     }
 

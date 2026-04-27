@@ -77,19 +77,17 @@ class StaticMasterReplicaConnector<K, V> implements MasterReplicaConnector<K, V>
             }
 
             return initializeConnection(codec, seedNode, connectionProvider, nodes);
-        }).thenCompose(java.util.function.Function.identity())
-                .handle((result, t) -> {
-                    if (t != null) {
-                        Throwable cause = t instanceof ExecutionException ? t.getCause() : t;
-                        throw new java.util.concurrent.CompletionException(cause);
-                    }
-                    return result;
-                });
+        }).thenCompose(java.util.function.Function.identity()).handle((result, t) -> {
+            if (t != null) {
+                Throwable cause = t instanceof ExecutionException ? t.getCause() : t;
+                throw new java.util.concurrent.CompletionException(cause);
+            }
+            return result;
+        });
     }
 
     private CompletableFuture<StatefulRedisMasterReplicaConnection<K, V>> initializeConnection(RedisCodec<K, V> codec,
-            RedisURI seedNode, MasterReplicaConnectionProvider<K, V> connectionProvider,
-            List<RedisNodeDescription> nodes) {
+            RedisURI seedNode, MasterReplicaConnectionProvider<K, V> connectionProvider, List<RedisNodeDescription> nodes) {
 
         connectionProvider.setKnownNodes(nodes);
 
