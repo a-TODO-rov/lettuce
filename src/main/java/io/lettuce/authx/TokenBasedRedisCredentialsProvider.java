@@ -7,7 +7,7 @@
 package io.lettuce.authx;
 
 import io.lettuce.core.RedisCredentials;
-import io.lettuce.core.RedisCredentialsProvider;
+import io.lettuce.core.ReactiveRedisCredentialsProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
@@ -19,7 +19,7 @@ import redis.clients.authentication.core.TokenListener;
 import redis.clients.authentication.core.TokenManager;
 
 /**
- * A {@link RedisCredentialsProvider} implementation that supports token-based authentication for Redis.
+ * A {@link io.lettuce.core.RedisCredentialsProvider} implementation that supports token-based authentication for Redis.
  * <p>
  * This provider uses a {@link TokenManager} to manage and renew tokens, ensuring that the Redis client can authenticate with
  * Redis using a dynamically updated token. This is particularly useful in scenarios where Redis access is controlled via
@@ -37,7 +37,7 @@ import redis.clients.authentication.core.TokenManager;
  *
  * @since 6.6
  */
-public class TokenBasedRedisCredentialsProvider implements RedisCredentialsProvider, AutoCloseable {
+public class TokenBasedRedisCredentialsProvider implements ReactiveRedisCredentialsProvider, AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(TokenBasedRedisCredentialsProvider.class);
 

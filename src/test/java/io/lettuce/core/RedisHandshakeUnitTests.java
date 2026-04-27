@@ -324,7 +324,7 @@ class RedisHandshakeUnitTests {
         output.set(ByteBuffer.wrap("1.2.3".getBytes()));
     }
 
-    static class DelayedRedisCredentialsProvider implements RedisCredentialsProvider {
+    static class DelayedRedisCredentialsProvider implements ReactiveRedisCredentialsProvider {
 
         private final Sinks.One<RedisCredentials> credentialsSink = Sinks.one();
 

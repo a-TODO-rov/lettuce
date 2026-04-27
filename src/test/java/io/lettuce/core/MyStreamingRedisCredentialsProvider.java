@@ -10,7 +10,7 @@ import reactor.core.publisher.Sinks;
  * @author Ivo Gaydajiev
  * @since 6.6.0
  */
-public class MyStreamingRedisCredentialsProvider implements RedisCredentialsProvider {
+public class MyStreamingRedisCredentialsProvider implements ReactiveRedisCredentialsProvider {
 
     private final Sinks.Many<RedisCredentials> credentialsSink = Sinks.many().replay().latest();
 
