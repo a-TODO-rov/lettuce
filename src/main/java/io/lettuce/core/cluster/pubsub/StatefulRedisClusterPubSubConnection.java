@@ -9,7 +9,6 @@ import io.lettuce.core.cluster.api.push.RedisClusterPushListener;
 import io.lettuce.core.cluster.api.sync.NodeSelection;
 import io.lettuce.core.cluster.models.partitions.Partitions;
 import io.lettuce.core.cluster.pubsub.api.async.RedisClusterPubSubAsyncCommands;
-import io.lettuce.core.cluster.pubsub.api.reactive.RedisClusterPubSubReactiveCommands;
 import io.lettuce.core.cluster.pubsub.api.sync.RedisClusterPubSubCommands;
 import io.lettuce.core.pubsub.RedisPubSubListener;
 import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
@@ -71,13 +70,6 @@ public interface StatefulRedisClusterPubSubConnection<K, V> extends StatefulRedi
      * @return the asynchronous API for the underlying connection.
      */
     RedisClusterPubSubAsyncCommands<K, V> async();
-
-    /**
-     * Returns the {@link RedisClusterPubSubReactiveCommands} API for the current connection. Does not create a new connection.
-     *
-     * @return the reactive API for the underlying connection.
-     */
-    RedisClusterPubSubReactiveCommands<K, V> reactive();
 
     /**
      * Retrieve a connection to the specified cluster node using the nodeId. Host and port are looked up in the node list. This

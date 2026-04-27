@@ -3,6 +3,7 @@ package io.lettuce.core.cluster.pubsub.api.reactive;
 import java.util.function.Predicate;
 
 import io.lettuce.core.cluster.models.partitions.RedisClusterNode;
+import io.lettuce.core.pubsub.StatefulRedisPubSubConnectionImpl;
 import io.lettuce.core.cluster.pubsub.StatefulRedisClusterPubSubConnection;
 import io.lettuce.core.pubsub.api.reactive.RedisPubSubReactiveCommands;
 
@@ -106,5 +107,24 @@ public interface RedisClusterPubSubReactiveCommands<K, V> extends RedisPubSubRea
      * @return API with reactive executed commands on a selection of cluster nodes matching {@code predicate}
      */
     PubSubReactiveNodeSelection<K, V> nodes(Predicate<RedisClusterNode> predicate);
+
+    /**
+     * Returns the {@link RedisClusterPubSubReactiveCommands} API for the given connection. Requires {@code reactor-core} on
+     * the classpath.
+     *
+     * @param connection the stateful cluster PubSub connection, must not be {@code null}.
+     * @param <K> Key type.
+     * @param <V> Value type.
+     * @return the reactive cluster PubSub API for the underlying connection.
+     * @since 7.0
+     */
+    @SuppressWarnings("unchecked")
+    static <K, V> RedisClusterPubSubReactiveCommands<K, V> from(StatefulRedisClusterPubSubConnection<K, V> connection) {
+        if (connection instanceof StatefulRedisPubSubConnectionImpl) {
+            return (RedisClusterPubSubReactiveCommands<K, V>) ((StatefulRedisPubSubConnectionImpl<K, V>) connection).reactive();
+        }
+        throw new UnsupportedOperationException("Connection of type " + connection.getClass().getName()
+                + " does not support the reactive cluster PubSub API.");
+    }
 
 }

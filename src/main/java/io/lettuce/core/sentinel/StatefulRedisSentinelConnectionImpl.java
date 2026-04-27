@@ -116,7 +116,6 @@ public class StatefulRedisSentinelConnectionImpl<K, V> extends RedisChannelHandl
         return new RedisSentinelReactiveCommandsImpl<>(this, codec, parser);
     }
 
-    @Override
     public RedisSentinelReactiveCommands<K, V> reactive() {
         ReactorProvider.checkForReactorLibrary();
         RedisSentinelReactiveCommandsImpl<K, V> result = reactive;

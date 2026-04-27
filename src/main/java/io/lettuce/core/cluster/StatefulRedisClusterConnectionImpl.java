@@ -167,7 +167,6 @@ public class StatefulRedisClusterConnectionImpl<K, V> extends RedisChannelHandle
         return async;
     }
 
-    @Override
     public RedisAdvancedClusterReactiveCommands<K, V> reactive() {
         ReactorProvider.checkForReactorLibrary();
         RedisAdvancedClusterReactiveCommandsImpl<K, V> result = reactive;

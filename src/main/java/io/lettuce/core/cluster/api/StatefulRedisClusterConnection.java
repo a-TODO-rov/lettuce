@@ -29,7 +29,6 @@ import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.cluster.ClusterClientOptions;
 import io.lettuce.core.cluster.api.async.RedisAdvancedClusterAsyncCommands;
 import io.lettuce.core.cluster.api.push.RedisClusterPushListener;
-import io.lettuce.core.cluster.api.reactive.RedisAdvancedClusterReactiveCommands;
 import io.lettuce.core.cluster.api.sync.RedisAdvancedClusterCommands;
 import io.lettuce.core.cluster.models.partitions.Partitions;
 import io.lettuce.core.protocol.ConnectionIntent;
@@ -58,14 +57,6 @@ public interface StatefulRedisClusterConnection<K, V> extends StatefulConnection
      * @return the asynchronous API for the underlying connection.
      */
     RedisAdvancedClusterAsyncCommands<K, V> async();
-
-    /**
-     * Returns the {@link RedisAdvancedClusterReactiveCommands} API for the current connection. Does not create a new
-     * connection.
-     *
-     * @return the reactive API for the underlying connection.
-     */
-    RedisAdvancedClusterReactiveCommands<K, V> reactive();
 
     /**
      * Retrieve a connection to the specified cluster node using the {@code nodeId} suitable for {@link ConnectionIntent#WRITE
