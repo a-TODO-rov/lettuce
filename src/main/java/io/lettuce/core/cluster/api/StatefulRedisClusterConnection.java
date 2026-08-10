@@ -25,6 +25,7 @@ import io.lettuce.core.ReadFrom;
 import io.lettuce.core.RedisChannelWriter;
 import io.lettuce.core.RedisException;
 import io.lettuce.core.api.CommandsFactory;
+import io.lettuce.core.cluster.api.reactive.RedisAdvancedClusterReactiveCommands;
 import io.lettuce.core.api.StatefulConnection;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.cluster.ClusterClientOptions;
@@ -295,5 +296,18 @@ public interface StatefulRedisClusterConnection<K, V> extends StatefulConnection
      * @since 7.7
      */
     <T> T commands(CommandsFactory<StatefulRedisClusterConnection<K, V>, T> factory);
+
+    /**
+     * Returns the {@link RedisAdvancedClusterReactiveCommands} API for the current connection. Does not create a new
+     * connection.
+     * <p>
+     * Note: this accessor is scheduled for removal in a future major release; a {@code commands(...)}-based replacement is
+     * planned. Requires {@code reactor-core} on the class path.
+     *
+     * @return the reactive API for the underlying connection.
+     */
+    default RedisAdvancedClusterReactiveCommands<K, V> reactive() {
+        return commands(RedisAdvancedClusterReactiveCommands.factory());
+    }
 
 }

@@ -3,6 +3,7 @@ package io.lettuce.core.pubsub;
 import io.lettuce.core.api.PubSubCommandsFactory;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.pubsub.api.async.RedisPubSubAsyncCommands;
+import io.lettuce.core.pubsub.api.reactive.RedisPubSubReactiveCommands;
 import io.lettuce.core.pubsub.api.sync.RedisPubSubCommands;
 
 /**
@@ -68,5 +69,18 @@ public interface StatefulRedisPubSubConnection<K, V> extends StatefulRedisConnec
      * @since 7.7
      */
     <T> T commands(PubSubCommandsFactory<StatefulRedisPubSubConnection<K, V>, T> factory);
+
+    /**
+     * Returns the {@link RedisPubSubReactiveCommands} API for the current connection. Does not create a new connection.
+     * <p>
+     * Note: this accessor is scheduled for removal in a future major release; a {@code commands(...)}-based replacement is
+     * planned. Requires {@code reactor-core} on the class path.
+     *
+     * @return the reactive API for the underlying connection.
+     */
+    @Override
+    default RedisPubSubReactiveCommands<K, V> reactive() {
+        return commands(RedisPubSubReactiveCommands.factory());
+    }
 
 }

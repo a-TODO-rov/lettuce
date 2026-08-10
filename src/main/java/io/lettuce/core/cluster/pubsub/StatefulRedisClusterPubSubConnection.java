@@ -202,4 +202,17 @@ public interface StatefulRedisClusterPubSubConnection<K, V> extends StatefulRedi
      */
     <T> T commands(ClusterPubSubCommandsFactory<StatefulRedisClusterPubSubConnection<K, V>, T> factory);
 
+    /**
+     * Returns the {@link RedisClusterPubSubReactiveCommands} API for the current connection. Does not create a new connection.
+     * <p>
+     * Note: this accessor is scheduled for removal in a future major release; a {@code commands(...)}-based replacement is
+     * planned. Requires {@code reactor-core} on the class path.
+     *
+     * @return the reactive API for the underlying connection.
+     */
+    @Override
+    default RedisClusterPubSubReactiveCommands<K, V> reactive() {
+        return commands(RedisClusterPubSubReactiveCommands.factory());
+    }
+
 }

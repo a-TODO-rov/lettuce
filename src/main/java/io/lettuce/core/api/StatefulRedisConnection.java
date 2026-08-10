@@ -2,6 +2,7 @@ package io.lettuce.core.api;
 
 import io.lettuce.core.api.async.RedisAsyncCommands;
 import io.lettuce.core.api.push.PushListener;
+import io.lettuce.core.api.reactive.RedisReactiveCommands;
 import io.lettuce.core.api.sync.RedisCommands;
 import io.lettuce.core.protocol.ConnectionWatchdog;
 
@@ -72,5 +73,17 @@ public interface StatefulRedisConnection<K, V> extends StatefulConnection<K, V> 
      * @since 7.7
      */
     <T> T commands(CommandsFactory<StatefulRedisConnection<K, V>, T> factory);
+
+    /**
+     * Returns the {@link RedisReactiveCommands} API for the current connection. Does not create a new connection.
+     * <p>
+     * Note: this accessor is scheduled for removal in a future major release; a {@code commands(...)}-based replacement is
+     * planned. Requires {@code reactor-core} on the class path.
+     *
+     * @return the reactive API for the underlying connection.
+     */
+    default RedisReactiveCommands<K, V> reactive() {
+        return commands(RedisReactiveCommands.factory());
+    }
 
 }
