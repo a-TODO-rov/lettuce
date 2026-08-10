@@ -1,10 +1,15 @@
 package io.lettuce.core;
 
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+import io.lettuce.core.internal.Futures;
+import io.lettuce.core.internal.LettuceAssert;
+import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import io.lettuce.core.internal.LettuceAssert;
 
 /**
  * Interface for loading {@link RedisCredentials} that are used for authentication. A commonly-used implementation is
@@ -15,9 +20,11 @@ import io.lettuce.core.internal.LettuceAssert;
  *
  * @author Mark Paluch
  * @since 6.2
+ * @deprecated since 7.7, use {@link CredentialsProvider} instead; scheduled for removal in a future major release.
  */
+@Deprecated
 @FunctionalInterface
-public interface RedisCredentialsProvider {
+public interface RedisCredentialsProvider extends CredentialsProvider {
 
     /**
      * Returns {@link RedisCredentials} that can be used to authorize a Redis connection. Each implementation of
@@ -28,6 +35,17 @@ public interface RedisCredentialsProvider {
      * @return a {@link Mono} emitting {@link RedisCredentials} that can be used to authorize a Redis connection.
      */
     Mono<RedisCredentials> resolveCredentials();
+
+    /**
+     * Resolves the latest available credentials as a {@link CompletionStage}, adapting {@link #resolveCredentials()}.
+     *
+     * @return a {@link CompletionStage} that completes with the {@link RedisCredentials} used to authorize a Redis connection.
+     * @since 7.7
+     */
+    @Override
+    default CompletionStage<RedisCredentials> resolveCredentialsAsync() {
+        return resolveCredentials().toFuture();
+    }
 
     /**
      * Creates a new {@link RedisCredentialsProvider} from a given {@link Supplier}.
@@ -46,9 +64,10 @@ public interface RedisCredentialsProvider {
      * Some implementations of the {@link RedisCredentialsProvider} may support streaming new credentials, based on some event
      * that originates outside the driver. In this case they should indicate that so the {@link RedisAuthenticationHandler} is
      * able to process these new credentials.
-     * 
+     *
      * @return whether the {@link RedisCredentialsProvider} supports streaming credentials.
      */
+    @Override
     default boolean supportsStreaming() {
         return false;
     }
@@ -71,6 +90,19 @@ public interface RedisCredentialsProvider {
     }
 
     /**
+     * {@inheritDoc}
+     * <p>
+     * Bridges the reactive {@link #credentials()} stream to the callback-based {@link CredentialsProvider} contract.
+     *
+     * @since 7.7
+     */
+    @Override
+    default Subscription subscribeToCredentials(Consumer<RedisCredentials> onNext, Consumer<Throwable> onError) {
+        Disposable disposable = credentials().subscribe(onNext, onError);
+        return disposable::dispose;
+    }
+
+    /**
      * Extension to {@link RedisCredentialsProvider} that resolves credentials immediately without the need to defer the
      * credential resolution.
      */
@@ -80,6 +112,19 @@ public interface RedisCredentialsProvider {
         @Override
         default Mono<RedisCredentials> resolveCredentials() {
             return Mono.just(resolveCredentialsNow());
+        }
+
+        @Override
+        default CompletionStage<RedisCredentials> resolveCredentialsAsync() {
+            try {
+                RedisCredentials credentials = resolveCredentialsNow();
+                if (credentials == null) {
+                    return Futures.failed(new IllegalStateException("RedisCredentials resolved to null"));
+                }
+                return CompletableFuture.completedFuture(credentials);
+            } catch (Exception e) {
+                return Futures.failed(e);
+            }
         }
 
         /**
