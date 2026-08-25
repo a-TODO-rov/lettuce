@@ -214,7 +214,6 @@
             <groupId>io.projectreactor</groupId>
             <artifactId>reactor-core</artifactId>
             <version>${reactor.version}</version>
-            <optional>true</optional>
         </dependency>
 
         <!-- End of core dependencies -->

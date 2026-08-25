@@ -34,6 +34,7 @@ import io.lettuce.core.cluster.api.push.RedisClusterPushListener;
 import io.lettuce.core.cluster.api.sync.RedisAdvancedClusterCommands;
 import io.lettuce.core.cluster.models.partitions.Partitions;
 import io.lettuce.core.protocol.ConnectionIntent;
+import io.lettuce.core.internal.ReactorIncompatible;
 
 /**
  * A stateful cluster connection. Advanced cluster connections provide transparent command routing based on the first command
@@ -306,6 +307,7 @@ public interface StatefulRedisClusterConnection<K, V> extends StatefulConnection
      *
      * @return the reactive API for the underlying connection.
      */
+    @ReactorIncompatible
     default RedisAdvancedClusterReactiveCommands<K, V> reactive() {
         return commands(RedisAdvancedClusterReactiveCommands.factory());
     }

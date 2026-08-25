@@ -44,6 +44,7 @@ import io.lettuce.core.internal.HostAndPort;
 import io.lettuce.core.internal.LettuceAssert;
 import io.lettuce.core.internal.LettuceSets;
 import io.lettuce.core.internal.LettuceStrings;
+import io.lettuce.core.internal.ReactorIncompatible;
 
 /**
  * Redis URI. Contains connection details for the Redis/Sentinel connections. You can provide the database, client name,
@@ -551,6 +552,7 @@ public class RedisURI implements Serializable, ConnectionPoint {
      *             release.
      */
     @Deprecated
+    @ReactorIncompatible
     public RedisCredentialsProvider getCredentialsProvider() {
         if (this.credentialsProvider instanceof RedisCredentialsProvider) {
             return (RedisCredentialsProvider) this.credentialsProvider;

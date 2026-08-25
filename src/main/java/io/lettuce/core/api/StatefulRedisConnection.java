@@ -4,6 +4,7 @@ import io.lettuce.core.api.async.RedisAsyncCommands;
 import io.lettuce.core.api.push.PushListener;
 import io.lettuce.core.api.reactive.RedisReactiveCommands;
 import io.lettuce.core.api.sync.RedisCommands;
+import io.lettuce.core.internal.ReactorIncompatible;
 import io.lettuce.core.protocol.ConnectionWatchdog;
 
 /**
@@ -82,6 +83,7 @@ public interface StatefulRedisConnection<K, V> extends StatefulConnection<K, V> 
      *
      * @return the reactive API for the underlying connection.
      */
+    @ReactorIncompatible
     default RedisReactiveCommands<K, V> reactive() {
         return commands(RedisReactiveCommands.factory());
     }

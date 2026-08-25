@@ -11,6 +11,7 @@ import io.lettuce.core.*;
 import io.lettuce.core.cluster.api.StatefulRedisClusterConnection;
 import io.lettuce.core.cluster.models.partitions.RedisClusterNode;
 import io.lettuce.core.models.role.RedisNodeDescription;
+import io.lettuce.core.internal.ReactorIncompatible;
 
 /**
  * Methods to support a Cluster-wide SCAN operation over multiple hosts.
@@ -61,8 +62,10 @@ class ClusterScanSupport {
 
     // Reactive mappers are lazily initialized to avoid loading reactor.core.publisher.Mono at class init time,
     // which would fail when reactor-core is not on the classpath (e.g. GraalVM native image without reactor).
+    @ReactorIncompatible
     private static volatile ScanCursorMapper<Mono<KeyScanCursor<?>>> reactiveKeyScanCursorMapper;
 
+    @ReactorIncompatible
     private static volatile ScanCursorMapper<Mono<StreamScanCursor>> reactiveStreamScanCursorMapper;
 
     /**
@@ -194,6 +197,7 @@ class ClusterScanSupport {
     }
 
     @SuppressWarnings("unchecked")
+    @ReactorIncompatible
     static <K> ScanCursorMapper<Mono<KeyScanCursor<K>>> reactiveClusterKeyScanCursorMapper() {
         if (reactiveKeyScanCursorMapper == null) {
             reactiveKeyScanCursorMapper = (nodeIds, currentNodeId, cursor) -> cursor
@@ -202,6 +206,7 @@ class ClusterScanSupport {
         return (ScanCursorMapper) reactiveKeyScanCursorMapper;
     }
 
+    @ReactorIncompatible
     static ScanCursorMapper<Mono<StreamScanCursor>> reactiveClusterStreamScanCursorMapper() {
         if (reactiveStreamScanCursorMapper == null) {
             reactiveStreamScanCursorMapper = (nodeIds, currentNodeId, cursor) -> cursor

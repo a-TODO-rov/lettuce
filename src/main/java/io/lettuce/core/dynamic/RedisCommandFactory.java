@@ -33,6 +33,7 @@ import io.lettuce.core.protocol.RedisCommand;
 import io.lettuce.core.support.ConnectionWrapping;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
+import io.lettuce.core.internal.ReactorIncompatible;
 
 /**
  * Factory to create Redis Command interface instances.
@@ -237,6 +238,7 @@ public class RedisCommandFactory {
 
         private final AsyncExecutableCommandLookupStrategy async;
 
+        @ReactorIncompatible
         private final ReactiveExecutableCommandLookupStrategy reactive;
 
         CompositeCommandLookupStrategy() {
@@ -257,6 +259,7 @@ public class RedisCommandFactory {
             }
         }
 
+        @ReactorIncompatible
         private AbstractRedisReactiveCommands getReactiveCommands() {
 
             Object reactive = null;
