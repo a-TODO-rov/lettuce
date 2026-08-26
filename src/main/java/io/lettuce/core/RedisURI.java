@@ -165,6 +165,12 @@ import io.lettuce.core.internal.ReactorIncompatible;
  */
 public class RedisURI implements Serializable, ConnectionPoint {
 
+    /**
+     * Pinned to the value historically computed for this class so it stays stable across releases and identical between the
+     * full and reactor-free distributions (whose stripped members would otherwise shift the default id).
+     */
+    private static final long serialVersionUID = 1127374961536149528L;
+
     public static final String URI_SCHEME_REDIS_SENTINEL = "redis-sentinel";
 
     public static final String URI_SCHEME_REDIS_SENTINEL_SECURE = "rediss-sentinel";
