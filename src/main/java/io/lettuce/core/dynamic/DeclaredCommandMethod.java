@@ -62,7 +62,7 @@ public class DeclaredCommandMethod implements CommandMethod {
         this.returnType = ResolvableType.forMethodReturnType(method);
         this.parameters = parameters;
         this.futureExecution = Future.class.isAssignableFrom(getReturnType().getRawClass());
-        this.reactiveExecution = ReactiveTypes.supports(getReturnType().getRawClass());
+        this.reactiveExecution = isReactiveReturnType(getReturnType().getRawClass());
 
         Collections.addAll(arguments, method.getParameterTypes());
 
@@ -164,6 +164,35 @@ public class DeclaredCommandMethod implements CommandMethod {
     @Override
     public boolean isReactiveExecution() {
         return reactiveExecution;
+    }
+
+    /**
+     * Reactor-free seam. {@code ReactiveTypes} is removed from the reactor-free distribution, so its reactive-return-type
+     * detection is reached reflectively rather than by a compile-time reference. When the reactive wrapper libraries are absent
+     * the class is gone and this reports the return type as non-reactive - which is correct, since reactive command methods
+     * cannot be used without them.
+     */
+    private static final Method REACTIVE_SUPPORTS = resolveReactiveSupports();
+
+    private static Method resolveReactiveSupports() {
+        try {
+            Method supports = Class.forName("io.lettuce.core.dynamic.ReactiveTypes").getDeclaredMethod("supports", Class.class);
+            supports.setAccessible(true);
+            return supports;
+        } catch (ReflectiveOperationException e) {
+            return null;
+        }
+    }
+
+    private static boolean isReactiveReturnType(Class<?> type) {
+        if (REACTIVE_SUPPORTS == null) {
+            return false;
+        }
+        try {
+            return (boolean) REACTIVE_SUPPORTS.invoke(null, type);
+        } catch (ReflectiveOperationException e) {
+            return false;
+        }
     }
 
     /**

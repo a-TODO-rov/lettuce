@@ -1,22 +1,16 @@
 package io.lettuce.core.dynamic;
 
-import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-import io.lettuce.core.AbstractRedisReactiveCommands;
 import io.lettuce.core.RedisCommandExecutionException;
 import io.lettuce.core.api.StatefulConnection;
 import io.lettuce.core.api.StatefulRedisConnection;
-import io.lettuce.core.api.reactive.RedisReactiveCommands;
 import io.lettuce.core.cluster.api.StatefulRedisClusterConnection;
-import io.lettuce.core.cluster.api.reactive.RedisAdvancedClusterReactiveCommands;
 import io.lettuce.core.codec.ByteArrayCodec;
 import io.lettuce.core.codec.RedisCodec;
 import io.lettuce.core.codec.StringCodec;
-import io.lettuce.core.dynamic.ReactiveTypes.ReactiveLibrary;
 import io.lettuce.core.dynamic.batch.BatchSize;
 import io.lettuce.core.dynamic.intercept.DefaultMethodInvokingInterceptor;
 import io.lettuce.core.dynamic.intercept.InvocationProxyFactory;
@@ -30,10 +24,8 @@ import io.lettuce.core.internal.LettuceLists;
 import io.lettuce.core.models.command.CommandDetail;
 import io.lettuce.core.models.command.CommandDetailParser;
 import io.lettuce.core.protocol.RedisCommand;
-import io.lettuce.core.support.ConnectionWrapping;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
-import io.lettuce.core.internal.ReactorIncompatible;
 
 /**
  * Factory to create Redis Command interface instances.
@@ -233,13 +225,31 @@ public class RedisCommandFactory {
 
     }
 
+    /**
+     * Reactor-free seam. The reactive lookup strategy is built by {@code ReactiveCommandLookupFactory}, which is removed from
+     * the reactor-free distribution; we reach it reflectively so this class carries no reactive symbol. Returns {@code null}
+     * when Project Reactor is absent - in which case reactive command methods are unavailable and never dispatched.
+     */
+    private static ExecutableCommandLookupStrategy createReactiveLookupStrategy(List<RedisCodec<?, ?>> redisCodecs,
+            CommandOutputFactoryResolver outputFactoryResolver, CommandMethodVerifier verifier,
+            StatefulConnection<?, ?> connection) {
+        try {
+            Method create = Class.forName("io.lettuce.core.dynamic.ReactiveCommandLookupFactory").getDeclaredMethod("create",
+                    List.class, CommandOutputFactoryResolver.class, CommandMethodVerifier.class, StatefulConnection.class);
+            create.setAccessible(true);
+            return (ExecutableCommandLookupStrategy) create.invoke(null, redisCodecs, outputFactoryResolver, verifier,
+                    connection);
+        } catch (ReflectiveOperationException e) {
+            return null;
+        }
+    }
+
     @SuppressWarnings({ "rawtypes", "unchecked" })
     class CompositeCommandLookupStrategy implements ExecutableCommandLookupStrategy {
 
         private final AsyncExecutableCommandLookupStrategy async;
 
-        @ReactorIncompatible
-        private final ReactiveExecutableCommandLookupStrategy reactive;
+        private final ExecutableCommandLookupStrategy reactive;
 
         CompositeCommandLookupStrategy() {
 
@@ -248,38 +258,7 @@ public class RedisCommandFactory {
             this.async = new AsyncExecutableCommandLookupStrategy(redisCodecs, commandOutputFactoryResolver, verifier,
                     (StatefulConnection) connection);
 
-            if (ReactiveTypes.isAvailable(ReactiveLibrary.PROJECT_REACTOR)) {
-                AbstractRedisReactiveCommands reactive = getReactiveCommands();
-
-                LettuceAssert.isTrue(reactive != null, "Reactive commands is null");
-                this.reactive = new ReactiveExecutableCommandLookupStrategy(redisCodecs, commandOutputFactoryResolver, verifier,
-                        reactive);
-            } else {
-                this.reactive = null;
-            }
-        }
-
-        @ReactorIncompatible
-        private AbstractRedisReactiveCommands getReactiveCommands() {
-
-            Object reactive = null;
-
-            if (connection instanceof StatefulRedisConnection) {
-                reactive = ((StatefulRedisConnection) connection).commands(RedisReactiveCommands.factory());
-            }
-
-            if (connection instanceof StatefulRedisClusterConnection) {
-                reactive = ((StatefulRedisClusterConnection) connection)
-                        .commands(RedisAdvancedClusterReactiveCommands.factory());
-            }
-
-            if (reactive != null && Proxy.isProxyClass(reactive.getClass())) {
-
-                InvocationHandler invocationHandler = Proxy.getInvocationHandler(reactive);
-                reactive = ConnectionWrapping.unwrap(invocationHandler);
-            }
-
-            return (AbstractRedisReactiveCommands) reactive;
+            this.reactive = createReactiveLookupStrategy(redisCodecs, commandOutputFactoryResolver, verifier, connection);
         }
 
         @Override

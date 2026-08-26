@@ -21,21 +21,13 @@ import java.util.stream.Stream;
 import com.github.javaparser.ParserConfiguration;
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
-import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.body.BodyDeclaration;
 import com.github.javaparser.ast.body.ConstructorDeclaration;
 import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.comments.Comment;
-import com.github.javaparser.ast.expr.AssignExpr;
-import com.github.javaparser.ast.expr.BooleanLiteralExpr;
-import com.github.javaparser.ast.expr.Expression;
-import com.github.javaparser.ast.expr.IntegerLiteralExpr;
-import com.github.javaparser.ast.expr.NullLiteralExpr;
 import com.github.javaparser.ast.expr.SimpleName;
-import com.github.javaparser.ast.stmt.ExpressionStmt;
-import com.github.javaparser.ast.stmt.IfStmt;
 import com.github.javaparser.ast.type.Type;
 import com.github.javaparser.printer.lexicalpreservation.LexicalPreservingPrinter;
 
@@ -43,12 +35,12 @@ import com.github.javaparser.printer.lexicalpreservation.LexicalPreservingPrinte
  * Two-mode tool for the reactor-free Lettuce distribution.
  * <ul>
  * <li><b>annotate</b> (one-time / drift check): finds members whose signature references a reactive type and inserts the
- * {@code @ReactorIncompatible} marker + import into the real source. This is how the markers get placed; afterwards the source
- * is self-documenting and maintainers keep the markers by hand.</li>
- * <li><b>strip</b> (build-time, the default): over a COPY of {@code src/main/java}, deletes reactive files by convention,
- * deletes {@code @ReactorIncompatible} members/types (with their javadoc), removes statements that reference removed symbols,
- * cleans imports, and scrubs dangling {@code {@link}}s. It performs NO type inference - removal is purely marker/convention
- * driven.</li>
+ * {@code @ReactorIncompatible} marker. This is how the markers are placed; afterwards the source is self-documenting.</li>
+ * <li><b>strip</b> (build-time, the default): over a COPY of {@code src/main/java}, deletes reactive files by convention or a
+ * type-level marker, deletes {@code @ReactorIncompatible} members (with their javadoc), removes now-unused reactive imports,
+ * and scrubs {@code {@link}}s to removed symbols. It is a pure declaration-level rewrite - <b>no statement analysis, no type
+ * inference, no field defaulting</b>. Any reactor coupling inside a shared method body must be moved behind a reflective seam
+ * in the source (so nothing names a reactive type in a body); the reactor-free compile is the backstop.</li>
  * </ul>
  * Usage: {@code ReactorFreeTransformer [annotate] <root>} (no mode = strip).
  */
@@ -58,10 +50,11 @@ public final class ReactorFreeTransformer {
 
     private static final String MARKER_FQN = "io.lettuce.core.internal.ReactorIncompatible";
 
-    /** Reactor / Reactive Streams publisher types - the only inference input, and only for the annotate pass + statements. */
+    /** Reactor / Reactive Streams publisher types - inference input for the annotate pass only. */
     private static final Set<String> REACTOR_TYPES = Set.of("Mono", "Flux", "Publisher", "ConnectableFlux", "ParallelFlux",
             "GroupedFlux");
 
+    /** Pure-reactive helpers that live outside a reactive package and are removed wholesale. */
     private static final Set<String> RECLASSIFIED_REACTIVE = Set.of("ScanStream", "RedisPublisher", "Operators",
             "RedisCredentialsProvider", "AsyncCredentialsProviderAdapter");
 
@@ -86,7 +79,7 @@ public final class ReactorFreeTransformer {
         for (Path f : javaFiles(root)) {
             String rel = root.relativize(f).toString().replace('\\', '/');
             if (isConventionReactive(rel, f.getFileName().toString().replace(".java", ""))) {
-                continue; // whole file removed by convention; no marker needed
+                continue;
             }
             CompilationUnit cu = StaticJavaParser.parse(f);
             LexicalPreservingPrinter.setup(cu);
@@ -108,26 +101,20 @@ public final class ReactorFreeTransformer {
         System.out.printf("[reactor-free annotate] added %d @ReactorIncompatible markers%n", annotated);
     }
 
-    // ---- strip: annotation + convention driven removal (no inference) ----
+    // ---- strip: pure declaration-level removal (convention files + @ReactorIncompatible declarations) ----
     private static void strip(Path root) throws IOException {
         List<Path> files = javaFiles(root);
 
-        // Phase A: delete reactive files by convention or type-level marker; record their type names.
-        // `typeRefs` (reactive TYPE names) is what statement removal keys on - never method names, which collide
-        // across classes (e.g. RedisURI's removed reactive getCredentialsProvider vs ConnectionState's reactor-free one).
-        Set<String> typeRefs = new TreeSet<>(REACTOR_TYPES);
+        // Phase A: delete reactive files (convention or type-level marker); record their names for link scrubbing.
         Set<String> linkTargets = new TreeSet<>();
         List<Path> toDelete = new ArrayList<>();
         for (Path f : files) {
             String rel = root.relativize(f).toString().replace('\\', '/');
             String typeName = f.getFileName().toString().replace(".java", "");
-            boolean remove = isConventionReactive(rel, typeName);
-            if (!remove) {
-                remove = StaticJavaParser.parse(f).getTypes().stream().anyMatch(t -> t.getAnnotationByName(MARKER).isPresent());
-            }
+            boolean remove = isConventionReactive(rel, typeName)
+                    || StaticJavaParser.parse(f).getTypes().stream().anyMatch(t -> t.getAnnotationByName(MARKER).isPresent());
             if (remove) {
                 toDelete.add(f);
-                typeRefs.add(typeName);
                 linkTargets.add(typeName);
             }
         }
@@ -136,7 +123,7 @@ public final class ReactorFreeTransformer {
         }
         List<Path> retained = files.stream().filter(f -> !toDelete.contains(f)).collect(Collectors.toList());
 
-        // Pre-scan: collect removed member names for LINK scrubbing only (safe - it edits javadoc, not code).
+        // Pre-scan: record removed member names, for link scrubbing only.
         for (Path f : retained) {
             for (BodyDeclaration<?> m : StaticJavaParser.parse(f).findAll(BodyDeclaration.class)) {
                 if (m.getAnnotationByName(MARKER).isPresent()) {
@@ -145,46 +132,15 @@ public final class ReactorFreeTransformer {
             }
         }
 
-        // Edit pass: remove annotated members, statements referencing a reactive type or a this-file removed field,
-        // and reactive imports.
+        // Edit pass: delete @ReactorIncompatible members (+ their javadoc) and now-unused reactive imports.
         for (Path f : retained) {
             CompilationUnit cu = StaticJavaParser.parse(f);
             LexicalPreservingPrinter.setup(cu);
             boolean changed = false;
-            Set<String> stmtRefs = new LinkedHashSet<>(typeRefs);
             for (BodyDeclaration<?> m : new ArrayList<>(cu.findAll(BodyDeclaration.class))) {
                 if (m.getAnnotationByName(MARKER).isPresent()) {
-                    if (m instanceof FieldDeclaration fd) {
-                        fd.getVariables().forEach(v -> stmtRefs.add(v.getNameAsString()));
-                    }
                     m.getComment().ifPresent(Comment::remove);
                     m.remove();
-                    changed = true;
-                }
-            }
-            for (IfStmt st : new ArrayList<>(cu.findAll(IfStmt.class))) {
-                if (st.getParentNode().isPresent() && references(st, stmtRefs)) {
-                    st.remove();
-                    changed = true;
-                }
-            }
-            for (ExpressionStmt st : new ArrayList<>(cu.findAll(ExpressionStmt.class))) {
-                if (st.getParentNode().isEmpty()) {
-                    continue;
-                }
-                if (st.getExpression() instanceof AssignExpr assign && references(assign.getValue(), stmtRefs)) {
-                    // assignment to a (retained) field from a reactive value -> default it, so final fields stay initialized
-                    String target = assign.getTarget().toString();
-                    String field = target.contains(".") ? target.substring(target.lastIndexOf('.') + 1) : target;
-                    String type = fieldType(cu, field);
-                    if (type != null) {
-                        assign.setValue(defaultFor(type));
-                    } else {
-                        st.remove();
-                    }
-                    changed = true;
-                } else if (references(st, stmtRefs)) {
-                    st.remove();
                     changed = true;
                 }
             }
@@ -194,7 +150,7 @@ public final class ReactorFreeTransformer {
             }
         }
 
-        // Link-scrub pass.
+        // Link-scrub pass: {@link}/@see to removed symbols become {@code} / are dropped.
         int scrubbed = 0;
         for (Path f : retained) {
             String src = Files.readString(f);
@@ -204,8 +160,7 @@ public final class ReactorFreeTransformer {
                 scrubbed++;
             }
         }
-        System.out.printf("[reactor-free strip] deleted %d files, reactive-type refs %d, link-scrubbed %d files%n",
-                toDelete.size(), typeRefs.size(), scrubbed);
+        System.out.printf("[reactor-free strip] deleted %d files, link-scrubbed %d files%n", toDelete.size(), scrubbed);
     }
 
     private static List<Path> javaFiles(Path root) throws IOException {
@@ -244,37 +199,9 @@ public final class ReactorFreeTransformer {
             return false;
         }
         Set<String> reactive = new LinkedHashSet<>(REACTOR_TYPES);
-        reactive.addAll(RECLASSIFIED_REACTIVE); // e.g. RedisCredentialsProvider - reactive but not "*Reactive*"-named
-        // a type is reactive if it is a reactor publisher type, a reclassified reactive helper, or a *Reactive* API type
+        reactive.addAll(RECLASSIFIED_REACTIVE);
         return types.stream().anyMatch(t -> t.findAll(SimpleName.class).stream()
                 .anyMatch(s -> reactive.contains(s.getIdentifier()) || s.getIdentifier().contains("Reactive")));
-    }
-
-    private static boolean references(Node n, Set<String> names) {
-        return n.findAll(SimpleName.class).stream().anyMatch(s -> names.contains(s.getIdentifier()));
-    }
-
-    private static String fieldType(CompilationUnit cu, String name) {
-        return cu.findAll(FieldDeclaration.class).stream().flatMap(fd -> fd.getVariables().stream())
-                .filter(v -> v.getNameAsString().equals(name)).map(v -> v.getType().asString()).findFirst().orElse(null);
-    }
-
-    private static Expression defaultFor(String type) {
-        switch (type) {
-            case "boolean":
-            case "Boolean":
-                return new BooleanLiteralExpr(false);
-            case "int":
-            case "long":
-            case "short":
-            case "byte":
-            case "char":
-            case "double":
-            case "float":
-                return new IntegerLiteralExpr("0");
-            default:
-                return new NullLiteralExpr();
-        }
     }
 
     private static String scrubLinks(String src, Set<String> removed) {
