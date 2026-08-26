@@ -88,6 +88,11 @@ public final class ReactorFreePomDeps {
             if (REACTIVE_GROUP_PREFIXES.stream().anyMatch(groupId::startsWith)) {
                 continue;
             }
+            // The flattened POM bakes ${os.detected.classifier} to the build platform (e.g. osx-aarch_64). Restore the
+            // property so the derived list is platform-neutral - otherwise the drift check fails on a different OS.
+            if ("netty-tcnative".equals(text(dep, "artifactId"))) {
+                childElements(dep, "classifier").forEach(c -> c.setTextContent("${os.detected.classifier}"));
+            }
             out.append(serialize(dep, 8)).append('\n');
         }
         return out.toString();
@@ -100,7 +105,8 @@ public final class ReactorFreePomDeps {
         if (!m.find()) {
             throw new IllegalStateException("markers not found in target POM: " + BEGIN);
         }
-        return pom.substring(0, m.start()) + Matcher.quoteReplacement(block) + pom.substring(m.end());
+        // Plain substring splice - do NOT quoteReplacement here (the block legitimately contains '${...}').
+        return pom.substring(0, m.start()) + block + pom.substring(m.end());
     }
 
     // ---- tiny DOM helpers ----
