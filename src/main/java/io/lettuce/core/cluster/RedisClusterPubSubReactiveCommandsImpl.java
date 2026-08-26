@@ -19,6 +19,8 @@
  */
 package io.lettuce.core.cluster;
 
+import io.lettuce.core.internal.ReactorIncompatible;
+
 import static io.lettuce.core.cluster.NodeSelectionInvocationHandler.ExecutionModel.*;
 
 import java.lang.reflect.Proxy;
@@ -51,6 +53,7 @@ import io.lettuce.core.pubsub.api.reactive.RedisPubSubReactiveCommands;
  * @author Mark Paluch
  * @since 5.0
  */
+@ReactorIncompatible
 public class RedisClusterPubSubReactiveCommandsImpl<K, V> extends RedisPubSubReactiveCommandsImpl<K, V>
         implements RedisClusterPubSubReactiveCommands<K, V> {
 

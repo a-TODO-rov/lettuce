@@ -5,6 +5,7 @@ import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.pubsub.api.async.RedisPubSubAsyncCommands;
 import io.lettuce.core.pubsub.api.reactive.RedisPubSubReactiveCommands;
 import io.lettuce.core.pubsub.api.sync.RedisPubSubCommands;
+import io.lettuce.core.internal.ReactorIncompatible;
 
 /**
  * An asynchronous thread-safe pub/sub connection to a redis server. After one or more channels are subscribed to only pub/sub
@@ -79,6 +80,7 @@ public interface StatefulRedisPubSubConnection<K, V> extends StatefulRedisConnec
      * @return the reactive API for the underlying connection.
      */
     @Override
+    @ReactorIncompatible
     default RedisPubSubReactiveCommands<K, V> reactive() {
         return commands(RedisPubSubReactiveCommands.factory());
     }

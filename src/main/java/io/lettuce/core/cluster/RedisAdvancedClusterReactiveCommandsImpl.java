@@ -19,6 +19,8 @@
  */
 package io.lettuce.core.cluster;
 
+import io.lettuce.core.internal.ReactorIncompatible;
+
 import static io.lettuce.core.cluster.ClusterScanSupport.*;
 import static io.lettuce.core.cluster.models.partitions.RedisClusterNode.NodeFlag.*;
 
@@ -93,6 +95,7 @@ import java.util.Optional;
  * @author Jon Chambers
  * @since 4.0
  */
+@ReactorIncompatible
 public class RedisAdvancedClusterReactiveCommandsImpl<K, V> extends AbstractRedisReactiveCommands<K, V>
         implements RedisAdvancedClusterReactiveCommands<K, V> {
 

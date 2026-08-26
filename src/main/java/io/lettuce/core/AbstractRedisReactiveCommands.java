@@ -19,6 +19,8 @@
  */
 package io.lettuce.core;
 
+import io.lettuce.core.internal.ReactorIncompatible;
+
 import io.lettuce.core.GeoArgs.Unit;
 import io.lettuce.core.api.StatefulConnection;
 import io.lettuce.core.api.reactive.*;
@@ -125,6 +127,7 @@ import static io.lettuce.core.protocol.CommandType.GEORADIUS_RO;
  * @author dae won
  * @since 4.0
  */
+@ReactorIncompatible
 public abstract class AbstractRedisReactiveCommands<K, V>
         implements RedisAclReactiveCommands<K, V>, RedisHashReactiveCommands<K, V>, RedisKeyReactiveCommands<K, V>,
         RedisStringReactiveCommands<K, V>, RedisListReactiveCommands<K, V>, RedisSetReactiveCommands<K, V>,

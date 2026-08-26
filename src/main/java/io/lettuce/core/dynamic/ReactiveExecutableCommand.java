@@ -1,5 +1,7 @@
 package io.lettuce.core.dynamic;
 
+import io.lettuce.core.internal.ReactorIncompatible;
+
 import io.lettuce.core.AbstractRedisReactiveCommands;
 
 /**
@@ -8,6 +10,7 @@ import io.lettuce.core.AbstractRedisReactiveCommands;
  * @author Mark Paluch
  * @since 5.0
  */
+@ReactorIncompatible
 class ReactiveExecutableCommand implements ExecutableCommand {
 
     private final CommandMethod commandMethod;

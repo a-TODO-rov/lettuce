@@ -6,6 +6,7 @@ import io.lettuce.core.sentinel.api.reactive.RedisSentinelReactiveCommands;
 import io.lettuce.core.protocol.ConnectionWatchdog;
 import io.lettuce.core.sentinel.api.async.RedisSentinelAsyncCommands;
 import io.lettuce.core.sentinel.api.sync.RedisSentinelCommands;
+import io.lettuce.core.internal.ReactorIncompatible;
 
 /**
  * A thread-safe connection to a redis server. Multiple threads may share one {@link StatefulRedisSentinelConnection}.
@@ -61,6 +62,7 @@ public interface StatefulRedisSentinelConnection<K, V> extends StatefulConnectio
      *
      * @return the reactive API for the underlying connection.
      */
+    @ReactorIncompatible
     default RedisSentinelReactiveCommands<K, V> reactive() {
         return commands(RedisSentinelReactiveCommands.factory());
     }

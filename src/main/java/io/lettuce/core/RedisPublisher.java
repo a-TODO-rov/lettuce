@@ -19,6 +19,8 @@
  */
 package io.lettuce.core;
 
+import io.lettuce.core.internal.ReactorIncompatible;
+
 import java.util.Collection;
 import java.util.Objects;
 import java.util.Queue;
@@ -62,6 +64,7 @@ import io.netty.util.internal.logging.InternalLoggerFactory;
  * @author Tihomir Mateev
  * @since 5.0
  */
+@ReactorIncompatible
 class RedisPublisher<K, V, T> implements Publisher<T> {
 
     private static final InternalLogger LOG = InternalLoggerFactory.getInstance(RedisPublisher.class);

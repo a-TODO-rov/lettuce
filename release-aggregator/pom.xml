@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+      Release aggregator. A pure aggregator (not a parent) whose only job is to build and
+      publish BOTH coordinates from the one source tree in a single reactor:
+
+        * io.lettuce:lettuce-core   (module "..")                   - full, reactor mandatory (SDR's jar)
+        * io.lettuce:lettuce        (module "../lettuce-reactor-free") - reactor-free, derived by strip
+
+      Because this aggregator is not the modules' <parent>, its config does not leak into them.
+      Usage: mvn -f release-aggregator/pom.xml <goal>
+    -->
+
+    <groupId>io.lettuce</groupId>
+    <artifactId>lettuce-release-aggregator</artifactId>
+    <version>8.0-REACTOR-OPTIONAL-PRE</version>
+    <packaging>pom</packaging>
+
+    <name>Lettuce Release Aggregator</name>
+
+    <properties>
+        <maven.deploy.skip>true</maven.deploy.skip>
+    </properties>
+
+    <modules>
+        <module>../lettuce-build-tools</module>
+        <module>..</module>
+        <module>../lettuce-reactor-free</module>
+    </modules>
+
+</project>

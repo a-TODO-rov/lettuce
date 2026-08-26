@@ -5,6 +5,11 @@ before_install:
   - sdk install maven 3.9.6
   - sdk use maven 3.9.6
 
+# Build the reactor-optional set via the release aggregator, which builds the three modules in order:
+#   lettuce-build-tools   -> the source stripper (needs JDK 17)
+#   .. (lettuce-core)      -> the full artifact + its flattened POM (input for the derived deps)
+#   lettuce-reactor-free   -> io.lettuce:lettuce, the reactor-free artifact
+# This installs BOTH io.lettuce:lettuce-core and io.lettuce:lettuce into the local repo, so a JitPack
+# consumer can depend on either module.
 install:
-  - mvn clean install -Dmaven.test.skip=true -DskipTests
-
+  - mvn clean install -f release-aggregator/pom.xml -Dmaven.test.skip=true -DskipTests

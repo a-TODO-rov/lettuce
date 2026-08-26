@@ -1,5 +1,7 @@
 package io.lettuce.core;
 
+import io.lettuce.core.internal.ReactorIncompatible;
+
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.api.reactive.RedisReactiveCommands;
 import io.lettuce.core.cluster.api.reactive.RedisClusterReactiveCommands;
@@ -16,6 +18,7 @@ import java.util.function.Supplier;
  * @param <V> Value type.
  * @author Mark Paluch
  */
+@ReactorIncompatible
 public class RedisReactiveCommandsImpl<K, V> extends AbstractRedisReactiveCommands<K, V>
         implements RedisReactiveCommands<K, V>, RedisClusterReactiveCommands<K, V> {
 

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+      Internal build tooling for Lettuce. Hosts the reactor-free source transformer used to derive the
+      io.lettuce:lettuce distribution. Not published.
+
+      The transformer is annotation-driven (@ReactorIncompatible, modelled on Guava's @GwtIncompatible)
+      plus a reactive-package convention, implemented as a JavaParser AST rewrite so that removals also
+      drop the element's javadoc, clean up imports, and scrub dangling {@link}s - none of which the earlier
+      regex prototype did.
+    -->
+
+    <groupId>io.lettuce</groupId>
+    <artifactId>lettuce-build-tools</artifactId>
+    <version>8.0-REACTOR-OPTIONAL-PRE</version>
+    <packaging>jar</packaging>
+
+    <name>Lettuce Build Tools</name>
+
+    <properties>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <maven.deploy.skip>true</maven.deploy.skip>
+        <maven.install.skip>true</maven.install.skip>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.github.javaparser</groupId>
+            <artifactId>javaparser-core</artifactId>
+            <version>3.26.2</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Self-contained executable jar (bundles JavaParser) so the reactor-free module can invoke it via java -jar. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.5.1</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <transformers>
+                                <transformer
+                                        implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>io.lettuce.build.ReactorFreeTransformer</mainClass>
+                                </transformer>
+                            </transformers>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

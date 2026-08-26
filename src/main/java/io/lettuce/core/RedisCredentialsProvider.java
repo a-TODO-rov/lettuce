@@ -1,5 +1,7 @@
 package io.lettuce.core;
 
+import io.lettuce.core.internal.ReactorIncompatible;
+
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Consumer;
@@ -24,6 +26,7 @@ import reactor.core.publisher.Mono;
  */
 @Deprecated
 @FunctionalInterface
+@ReactorIncompatible
 public interface RedisCredentialsProvider extends CredentialsProvider {
 
     /**

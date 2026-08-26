@@ -14,6 +14,7 @@ import io.lettuce.core.cluster.pubsub.api.reactive.RedisClusterPubSubReactiveCom
 import io.lettuce.core.cluster.pubsub.api.sync.RedisClusterPubSubCommands;
 import io.lettuce.core.pubsub.RedisPubSubListener;
 import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
+import io.lettuce.core.internal.ReactorIncompatible;
 
 /**
  * A stateful Pub/Sub connection for Redis Cluster use. This connection type is intended for Pub/Sub messaging with Redis
@@ -211,6 +212,7 @@ public interface StatefulRedisClusterPubSubConnection<K, V> extends StatefulRedi
      * @return the reactive API for the underlying connection.
      */
     @Override
+    @ReactorIncompatible
     default RedisClusterPubSubReactiveCommands<K, V> reactive() {
         return commands(RedisClusterPubSubReactiveCommands.factory());
     }

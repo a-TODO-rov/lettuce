@@ -19,6 +19,8 @@
  */
 package io.lettuce.core;
 
+import io.lettuce.core.internal.ReactorIncompatible;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +50,7 @@ import io.lettuce.core.internal.LettuceAssert;
  * @author Mikhael Sokolov
  * @since 5.1
  */
+@ReactorIncompatible
 public abstract class ScanStream {
 
     private ScanStream() {

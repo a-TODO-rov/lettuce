@@ -1,5 +1,6 @@
 package io.lettuce.core.cluster;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.time.Duration;
@@ -17,8 +18,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-
-import org.reactivestreams.Publisher;
 
 import io.lettuce.core.RedisCommandExecutionException;
 import io.lettuce.core.RedisCommandTimeoutException;
@@ -193,8 +192,7 @@ class NodeSelectionInvocationHandler extends AbstractInvocationHandler {
             throws ExecutionException, InterruptedException {
 
         if (executionModel == ExecutionModel.REACTIVE) {
-            Map<RedisClusterNode, CompletionStage<? extends Publisher<?>>> reactiveExecutions = (Map) executions;
-            return new ReactiveExecutionsImpl(reactiveExecutions);
+            return newReactiveExecutions(executions);
         }
 
         Map<RedisClusterNode, CompletionStage<?>> asyncExecutions = (Map) executions;
@@ -215,6 +213,36 @@ class NodeSelectionInvocationHandler extends AbstractInvocationHandler {
         }
 
         return new AsyncExecutionsImpl<>(asyncExecutions);
+    }
+
+    /**
+     * Reactor-free seam. {@code ReactiveExecutionsImpl} is removed from the reactor-free distribution, so reactive executions
+     * are constructed reflectively rather than by a compile-time reference. This path is only reached for
+     * {@link ExecutionModel#REACTIVE}, which cannot occur when Project Reactor is absent.
+     */
+    private static final Constructor<?> REACTIVE_EXECUTIONS = resolveReactiveExecutions();
+
+    private static Constructor<?> resolveReactiveExecutions() {
+        try {
+            Constructor<?> constructor = Class.forName("io.lettuce.core.cluster.ReactiveExecutionsImpl")
+                    .getDeclaredConstructor(Map.class);
+            constructor.setAccessible(true);
+            return constructor;
+        } catch (ReflectiveOperationException e) {
+            return null;
+        }
+    }
+
+    private static Object newReactiveExecutions(Map<RedisClusterNode, Object> executions) {
+        if (REACTIVE_EXECUTIONS == null) {
+            throw new UnsupportedOperationException(
+                    "Reactive execution requires Project Reactor, which is not on the class path.");
+        }
+        try {
+            return REACTIVE_EXECUTIONS.newInstance(executions);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     @SuppressWarnings("rawtypes")

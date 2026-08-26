@@ -1,5 +1,7 @@
 package io.lettuce.core.dynamic;
 
+import io.lettuce.core.internal.ReactorIncompatible;
+
 import io.lettuce.core.codec.RedisCodec;
 import io.lettuce.core.dynamic.output.CommandOutputFactory;
 import io.lettuce.core.dynamic.output.CommandOutputFactoryResolver;
@@ -12,6 +14,7 @@ import io.lettuce.core.dynamic.segment.CommandSegments;
  *
  * @author Mark Paluch
  */
+@ReactorIncompatible
 class ReactiveCommandSegmentCommandFactory extends CommandSegmentCommandFactory {
 
     private boolean streamingExecution;
