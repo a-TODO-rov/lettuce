@@ -1,5 +1,7 @@
 package io.lettuce.core;
 
+import io.lettuce.core.internal.ReactorIncompatible;
+
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.security.AccessController;
@@ -30,6 +32,7 @@ import io.netty.util.internal.logging.InternalLoggerFactory;
  * @author Mark Paluch
  * @since 5.0
  */
+@ReactorIncompatible
 class Operators {
 
     private static final InternalLogger LOG = InternalLoggerFactory.getInstance(Operators.class);

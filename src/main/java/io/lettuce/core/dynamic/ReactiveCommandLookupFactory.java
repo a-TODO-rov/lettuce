@@ -4,6 +4,8 @@
  */
 package io.lettuce.core.dynamic;
 
+import io.lettuce.core.internal.ReactorIncompatible;
+
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Proxy;
 import java.util.List;
@@ -23,6 +25,7 @@ import io.lettuce.core.support.ConnectionWrapping;
  * Builds the reactive dynamic-command {@link ExecutableCommandLookupStrategy}. This is Reactor-only and is removed from the
  * reactor-free distribution; {@link RedisCommandFactory} reaches it reflectively so that class carries no reactive symbol.
  */
+@ReactorIncompatible
 class ReactiveCommandLookupFactory {
 
     @SuppressWarnings({ "rawtypes", "unchecked" })

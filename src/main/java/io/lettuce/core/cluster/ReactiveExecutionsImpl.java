@@ -1,5 +1,7 @@
 package io.lettuce.core.cluster;
 
+import io.lettuce.core.internal.ReactorIncompatible;
+
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.CompletionStage;
@@ -17,6 +19,7 @@ import io.lettuce.core.cluster.models.partitions.RedisClusterNode;
  * @author Mark Paluch
  * @since 4.4
  */
+@ReactorIncompatible
 class ReactiveExecutionsImpl<T> implements ReactiveExecutions<T> {
 
     private Map<RedisClusterNode, CompletionStage<? extends Publisher<? extends T>>> executions;

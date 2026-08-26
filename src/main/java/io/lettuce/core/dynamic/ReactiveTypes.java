@@ -1,5 +1,7 @@
 package io.lettuce.core.dynamic;
 
+import io.lettuce.core.internal.ReactorIncompatible;
+
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.stream.Collectors;
@@ -40,6 +42,7 @@ import io.lettuce.core.internal.LettuceClassUtils;
  * @see Mono
  * @see Flux
  */
+@ReactorIncompatible
 class ReactiveTypes {
 
     private static final boolean PROJECT_REACTOR_PRESENT = LettuceClassUtils.isPresent("reactor.core.publisher.Mono");

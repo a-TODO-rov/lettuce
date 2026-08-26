@@ -19,6 +19,8 @@
  */
 package io.lettuce.core.sentinel;
 
+import io.lettuce.core.internal.ReactorIncompatible;
+
 import java.net.SocketAddress;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -47,6 +49,7 @@ import reactor.core.publisher.Mono;
  * @author Mark Paluch
  * @since 3.0
  */
+@ReactorIncompatible
 public class RedisSentinelReactiveCommandsImpl<K, V> extends AbstractRedisReactiveCommands<K, V>
         implements RedisSentinelReactiveCommands<K, V> {
 

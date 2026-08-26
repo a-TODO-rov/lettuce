@@ -4,6 +4,8 @@
  */
 package io.lettuce.core;
 
+import io.lettuce.core.internal.ReactorIncompatible;
+
 import java.util.concurrent.CompletionStage;
 import java.util.function.Consumer;
 
@@ -18,6 +20,7 @@ import reactor.core.publisher.Mono;
  * @author Aleksandar Todorov
  * @since 7.7
  */
+@ReactorIncompatible
 class AsyncCredentialsProviderAdapter implements RedisCredentialsProvider {
 
     private final CredentialsProvider delegate;

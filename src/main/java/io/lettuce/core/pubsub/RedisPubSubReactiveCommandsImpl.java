@@ -19,6 +19,8 @@
  */
 package io.lettuce.core.pubsub;
 
+import io.lettuce.core.internal.ReactorIncompatible;
+
 import java.util.Map;
 
 import reactor.core.publisher.Flux;
@@ -40,6 +42,7 @@ import io.lettuce.core.pubsub.api.reactive.RedisPubSubReactiveCommands;
  * @author Ali Takavci
  * @since 5.0
  */
+@ReactorIncompatible
 public class RedisPubSubReactiveCommandsImpl<K, V> extends RedisReactiveCommandsImpl<K, V>
         implements RedisPubSubReactiveCommands<K, V> {
 

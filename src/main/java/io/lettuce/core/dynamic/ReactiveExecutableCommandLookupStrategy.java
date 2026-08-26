@@ -1,5 +1,7 @@
 package io.lettuce.core.dynamic;
 
+import io.lettuce.core.internal.ReactorIncompatible;
+
 import java.util.List;
 
 import io.lettuce.core.AbstractRedisReactiveCommands;
@@ -15,6 +17,7 @@ import io.lettuce.core.internal.LettuceAssert;
  * @author Mark Paluch
  * @since 5.0
  */
+@ReactorIncompatible
 class ReactiveExecutableCommandLookupStrategy implements ExecutableCommandLookupStrategy {
 
     private final AbstractRedisReactiveCommands<Object, Object> redisReactiveCommands;

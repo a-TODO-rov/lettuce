@@ -1,5 +1,7 @@
 package io.lettuce.core.dynamic;
 
+import io.lettuce.core.internal.ReactorIncompatible;
+
 import java.util.function.Function;
 
 import org.reactivestreams.Publisher;
@@ -21,6 +23,7 @@ import io.reactivex.Maybe;
  * @author Mark Paluch
  * @since 5.0
  */
+@ReactorIncompatible
 class ReactiveTypeAdapters {
 
     /**
