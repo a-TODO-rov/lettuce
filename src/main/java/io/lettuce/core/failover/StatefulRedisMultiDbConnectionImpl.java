@@ -37,6 +37,7 @@ import io.lettuce.core.api.reactive.RedisReactiveCommands;
 import io.lettuce.core.api.sync.RedisCommands;
 import io.lettuce.core.cluster.api.sync.RedisClusterCommands;
 import io.lettuce.core.codec.RedisCodec;
+import io.lettuce.core.event.EventSequencer;
 import io.lettuce.core.failover.api.CircuitBreakerStateChangeEvent;
 import io.lettuce.core.failover.api.DatabaseConfig;
 import io.lettuce.core.failover.api.ImmutableRedisURI;
@@ -99,6 +100,12 @@ class StatefulRedisMultiDbConnectionImpl<C extends StatefulRedisConnection<K, V>
 
     private final ClientResources clientResources;
 
+    /**
+     * Publishes {@link DatabaseSwitchEvent}s in the order the switches happened, although they are published after the
+     * exclusive lock is released.
+     */
+    private final EventSequencer switchEvents;
+
     private final MultiDbOptions multiDbOptions;
 
     private final RedisDatabaseDeferredCompletion<C> completion;
@@ -158,6 +165,7 @@ class StatefulRedisMultiDbConnectionImpl<C extends StatefulRedisConnection<K, V>
         this.databases = new ConcurrentHashMap<>(connections);
 
         this.clientResources = resources;
+        this.switchEvents = new EventSequencer(resources.eventBus());
         this.codec = codec;
         this.connectionFactory = connectionFactory;
         this.healthStatusManager = healthStatusManager;
@@ -820,11 +828,16 @@ class StatefulRedisMultiDbConnectionImpl<C extends StatefulRedisConnection<K, V>
             fromDb.getDatabaseEndpoint().handOverCommandQueue(toDb.getDatabaseEndpoint());
 
             doOnSwitch(fromDb, toDb);
+
+            // reserve the event's place while still holding the lock, so that events follow the order of the switches
+            switchContext.eventTicket = switchEvents.reserve();
         });
 
         // Publish event outside the lock to avoid holding lock during event processing
-        if (switchContext.switched && !switchContext.toUri.equals(switchContext.fromUri)) {
-            publishSwitchEvent(reason, switchContext.fromUri, switchContext.toUri);
+        if (switchContext.eventTicket != null) {
+            try (EventSequencer.Ticket ticket = switchContext.eventTicket) {
+                publishSwitchEvent(ticket, reason, switchContext.fromUri, switchContext.toUri);
+            }
         }
 
         return switchContext.switched;
@@ -842,16 +855,16 @@ class StatefulRedisMultiDbConnectionImpl<C extends StatefulRedisConnection<K, V>
     }
 
     /**
-     * Publishes a {@link DatabaseSwitchEvent} to the event bus. This method is called outside the exclusive lock to avoid
-     * holding the lock during event processing.
+     * Publishes a {@link DatabaseSwitchEvent} at the place {@code ticket} reserved in the order of switches. This method is
+     * called outside the exclusive lock to avoid holding the lock during event processing.
      *
+     * @param ticket the ticket reserved for this switch while the exclusive lock was held
      * @param reason the reason for the database switch
      * @param fromUri the URI of the database being switched from
      * @param toUri the URI of the database being switched to
      */
-    protected void publishSwitchEvent(SwitchReason reason, RedisURI fromUri, RedisURI toUri) {
-        clientResources.eventBus()
-                .publish(new DatabaseSwitchEvent(reason, new ImmutableRedisURI(fromUri), new ImmutableRedisURI(toUri), this));
+    protected void publishSwitchEvent(EventSequencer.Ticket ticket, SwitchReason reason, RedisURI fromUri, RedisURI toUri) {
+        ticket.publish(new DatabaseSwitchEvent(reason, new ImmutableRedisURI(fromUri), new ImmutableRedisURI(toUri), this));
     }
 
     /**
@@ -1095,6 +1108,8 @@ class StatefulRedisMultiDbConnectionImpl<C extends StatefulRedisConnection<K, V>
         RedisURI fromUri;
 
         RedisURI toUri;
+
+        EventSequencer.Ticket eventTicket;
 
     }
 

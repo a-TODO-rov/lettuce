@@ -102,6 +102,57 @@ Flux.create(sink -> {
 A thread of the computation thread pool (can be configured using [client
 resources](client-resources.md)) transports the events.
 
+### Event order
+
+Each subscriber receives the events published by one thread in the
+order that thread published them. Events published one after the other,
+where the second `publish` starts after the first one returned, reach
+every subscriber in that order. This covers the events of one
+connection's channel (connect, activate, redirections,
+re-authentication, deactivate, disconnect) and the steps of a reconnect.
+
+Events published at the same moment by different threads, for example
+redirections from different cluster nodes, may reach different
+subscribers in different orders.
+
+Database switch events of a multi-database connection reach every
+subscriber in the order the switches happened.
+
+### Publishing your own events in order (since 8.0)
+
+If you publish your own events from several threads and every
+subscriber must receive them in one order, publish them through an
+`EventSequencer`. Reserve a ticket where the order is decided, for
+example while holding the lock that protects a state change, and publish
+it later:
+
+``` java
+EventSequencer regionEvents = new EventSequencer(client.getResources().eventBus());
+
+EventSequencer.Ticket ticket;
+synchronized (lock) {
+    activeRegion = region;
+    ticket = regionEvents.reserve();
+}
+try (EventSequencer.Ticket t = ticket) {
+    t.publish(new RegionChangedEvent(region));
+}
+```
+
+Subscribers receive the sequencer's events in ticket order, whatever
+order the tickets are published in. A ticket published before an
+earlier one is held back until the earlier ticket is published or
+closed; closing a ticket that was not published skips it. Use
+`regionEvents.publish(event)` to reserve and publish in one step.
+
+The order covers the events of one sequencer only. To guard against a
+ticket that is never published or closed, create the sequencer with a
+timer and a timeout after which such a ticket is skipped:
+
+``` java
+new EventSequencer(eventBus, client.getResources().timer(), Duration.ofSeconds(5));
+```
+
 ### Connection events
 
 When working with events, multiple events occur. These can be used to
