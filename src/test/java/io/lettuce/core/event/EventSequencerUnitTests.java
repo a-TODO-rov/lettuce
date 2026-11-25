@@ -36,16 +36,16 @@ class EventSequencerUnitTests {
     }
 
     @Test
-    void publishesInTicketOrder() {
+    void releasesInTicketOrder() {
 
         EventSequencer sut = new EventSequencer(bus);
         EventSequencer.Ticket t0 = sut.reserve();
         EventSequencer.Ticket t1 = sut.reserve();
         EventSequencer.Ticket t2 = sut.reserve();
 
-        t2.publish(new IndexedEvent(2));
-        t0.publish(new IndexedEvent(0));
-        t1.publish(new IndexedEvent(1));
+        t2.submit(new IndexedEvent(2));
+        t0.submit(new IndexedEvent(0));
+        t1.submit(new IndexedEvent(1));
 
         assertThat(bus.indexes()).containsExactly(0, 1, 2);
     }
@@ -57,10 +57,10 @@ class EventSequencerUnitTests {
         EventSequencer.Ticket t0 = sut.reserve();
         EventSequencer.Ticket t1 = sut.reserve();
 
-        t1.publish(new IndexedEvent(1));
+        t1.submit(new IndexedEvent(1));
         assertThat(bus.indexes()).isEmpty();
 
-        t0.publish(new IndexedEvent(0));
+        t0.submit(new IndexedEvent(0));
         assertThat(bus.indexes()).containsExactly(0, 1);
     }
 
@@ -85,9 +85,9 @@ class EventSequencerUnitTests {
         EventSequencer.Ticket t1 = sut.reserve();
         EventSequencer.Ticket t2 = sut.reserve();
 
-        Thread late = new Thread(() -> t0.publish(new IndexedEvent(0)));
-        t2.publish(new IndexedEvent(2));
-        t1.publish(new IndexedEvent(1));
+        Thread late = new Thread(() -> t0.submit(new IndexedEvent(0)));
+        t2.submit(new IndexedEvent(2));
+        t1.submit(new IndexedEvent(1));
         late.start();
         late.join(TimeUnit.SECONDS.toMillis(1));
 
@@ -97,62 +97,62 @@ class EventSequencerUnitTests {
     }
 
     @Test
-    void closedTicketIsSkipped() {
+    void cancelledTicketLeavesNoGap() {
 
         EventSequencer sut = new EventSequencer(bus);
         EventSequencer.Ticket t0 = sut.reserve();
         EventSequencer.Ticket t1 = sut.reserve();
 
-        t1.publish(new IndexedEvent(1));
-        t0.close();
+        t1.submit(new IndexedEvent(1));
+        t0.cancel();
 
         assertThat(bus.indexes()).containsExactly(1);
     }
 
     @Test
-    void closeAfterPublishDoesNothing() {
+    void closeAfterSubmitDoesNothing() {
 
         EventSequencer sut = new EventSequencer(bus);
 
         try (EventSequencer.Ticket ticket = sut.reserve()) {
-            ticket.publish(new IndexedEvent(0));
+            ticket.submit(new IndexedEvent(0));
         }
 
         assertThat(bus.indexes()).containsExactly(0);
     }
 
     @Test
-    void ticketCannotBePublishedTwice() {
+    void ticketCannotBeSubmittedTwice() {
 
         EventSequencer sut = new EventSequencer(bus);
         EventSequencer.Ticket ticket = sut.reserve();
-        ticket.publish(new IndexedEvent(0));
+        ticket.submit(new IndexedEvent(0));
 
-        assertThatThrownBy(() -> ticket.publish(new IndexedEvent(1))).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> ticket.submit(new IndexedEvent(1))).isInstanceOf(IllegalStateException.class);
         assertThat(bus.indexes()).containsExactly(0);
     }
 
     @Test
-    void publishReservesAndPublishesInOneStep() {
+    void submitReservesAndSubmitsInOneStep() {
 
         EventSequencer sut = new EventSequencer(bus);
         EventSequencer.Ticket earlier = sut.reserve();
 
-        sut.publish(new IndexedEvent(1));
+        sut.submit(new IndexedEvent(1));
         assertThat(bus.indexes()).isEmpty();
 
-        earlier.publish(new IndexedEvent(0));
+        earlier.submit(new IndexedEvent(0));
         assertThat(bus.indexes()).containsExactly(0, 1);
     }
 
     @Test
-    void abandonedTicketIsSkippedAfterTimeout() throws Exception {
+    void expiredTicketLeavesNoGap() throws Exception {
 
         HashedWheelTimer timer = new HashedWheelTimer(10, TimeUnit.MILLISECONDS);
         try {
             EventSequencer sut = new EventSequencer(bus, timer, Duration.ofMillis(50));
             EventSequencer.Ticket lost = sut.reserve();
-            sut.publish(new IndexedEvent(1));
+            sut.submit(new IndexedEvent(1));
 
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
             while (bus.indexes().isEmpty() && System.nanoTime() < deadline) {
@@ -160,7 +160,7 @@ class EventSequencerUnitTests {
             }
             assertThat(bus.indexes()).containsExactly(1);
 
-            lost.publish(new IndexedEvent(0)); // too late: dropped, not an error
+            lost.submit(new IndexedEvent(0)); // after expiry: dropped, not an error
             assertThat(bus.indexes()).containsExactly(1);
         } finally {
             timer.stop();
@@ -176,16 +176,16 @@ class EventSequencerUnitTests {
         EventSequencer.Ticket t2 = sut.reserve();
         EventSequencer.Ticket t3 = sut.reserve();
 
-        t1.publish(new IndexedEvent(1));
-        t2.publish(new IndexedEvent(2));
-        t3.publish(new IndexedEvent(3)); // over the limit: dropped
-        t0.publish(new IndexedEvent(0)); // the event all others wait for: never dropped
+        t1.submit(new IndexedEvent(1));
+        t2.submit(new IndexedEvent(2));
+        t3.submit(new IndexedEvent(3)); // over the limit: rejected
+        t0.submit(new IndexedEvent(0)); // the event all others wait for: never rejected
 
         assertThat(bus.indexes()).containsExactly(0, 1, 2);
     }
 
     @Test
-    void failingPublishDoesNotStopLaterTickets() {
+    void failingPublishDoesNotStopLaterEvents() {
 
         EventBus failing = new RecordingEventBus() {
 
@@ -201,10 +201,36 @@ class EventSequencerUnitTests {
         RecordingEventBus recorded = (RecordingEventBus) failing;
         EventSequencer sut = new EventSequencer(failing);
 
-        sut.publish(new IndexedEvent(0));
-        sut.publish(new IndexedEvent(1));
+        sut.submit(new IndexedEvent(0));
+        sut.submit(new IndexedEvent(1));
 
         assertThat(recorded.indexes()).containsExactly(1);
+    }
+
+    @Test
+    void closeCancelsUnsubmittedTicket() {
+
+        EventSequencer sut = new EventSequencer(bus);
+        EventSequencer.Ticket t1;
+
+        try (EventSequencer.Ticket t0 = sut.reserve()) {
+            t1 = sut.reserve();
+            // t0 is never submitted: closing it must not leave a gap
+        }
+        t1.submit(new IndexedEvent(1));
+
+        assertThat(bus.indexes()).containsExactly(1);
+    }
+
+    @Test
+    void cancelAfterSubmitDoesNothing() {
+
+        EventSequencer sut = new EventSequencer(bus);
+        EventSequencer.Ticket ticket = sut.reserve();
+        ticket.submit(new IndexedEvent(0));
+        ticket.cancel();
+
+        assertThat(bus.indexes()).containsExactly(0);
     }
 
     static class RecordingEventBus implements EventBus {

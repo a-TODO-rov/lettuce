@@ -122,9 +122,12 @@ subscriber in the order the switches happened.
 
 If you publish your own events from several threads and every
 subscriber must receive them in one order, publish them through an
-`EventSequencer`. Reserve a ticket where the order is decided, for
-example while holding the lock that protects a state change, and publish
-it later:
+`EventSequencer`:
+
+- **reserve** a ticket where the order is decided, for example while
+  holding the lock that protects a state change,
+- **submit** the event for that ticket later, after releasing the lock,
+- or **cancel** the ticket if there is no event after all.
 
 ``` java
 EventSequencer regionEvents = new EventSequencer(client.getResources().eventBus());
@@ -135,19 +138,22 @@ synchronized (lock) {
     ticket = regionEvents.reserve();
 }
 try (EventSequencer.Ticket t = ticket) {
-    t.publish(new RegionChangedEvent(region));
+    t.submit(new RegionChangedEvent(region));
 }
 ```
 
 Subscribers receive the sequencer's events in ticket order, whatever
-order the tickets are published in. A ticket published before an
-earlier one is held back until the earlier ticket is published or
-closed; closing a ticket that was not published skips it. Use
-`regionEvents.publish(event)` to reserve and publish in one step.
+order they are submitted in. An event submitted before an earlier
+ticket's event is held back; the thread that submits or cancels the
+earlier ticket then releases both to the event bus, in order. Submitting
+never waits. Closing a ticket cancels it unless it was submitted, so
+try-with-resources never leaves a gap. Use `regionEvents.submit(event)`
+to reserve and submit in one step.
 
 The order covers the events of one sequencer only. To guard against a
-ticket that is never published or closed, create the sequencer with a
-timer and a timeout after which such a ticket is skipped:
+ticket that is never submitted or cancelled, create the sequencer with a
+timer and an expiry; an expired ticket no longer holds back later ones,
+and an event submitted for it afterwards is dropped:
 
 ``` java
 new EventSequencer(eventBus, client.getResources().timer(), Duration.ofSeconds(5));

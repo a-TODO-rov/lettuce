@@ -1420,30 +1420,30 @@ class StatefulRedisMultiDbConnectionImplUnitTests {
     class SwitchEventOrderTests {
 
         @Test
-        @DisplayName("Should publish switch events in switch order even if published in reverse")
+        @DisplayName("Should publish switch events in switch order even if submitted in reverse")
         void shouldPublishSwitchEventsInSwitchOrder() throws Exception {
 
-            CountDownLatch firstPublishing = new CountDownLatch(1);
+            CountDownLatch firstSubmitting = new CountDownLatch(1);
             CountDownLatch releaseFirst = new CountDownLatch(1);
             AtomicBoolean first = new AtomicBoolean(true);
 
-            // The first switch pauses after releasing the lock and before publishing, so that the second switch publishes
+            // The first switch pauses after releasing the lock and before submitting, so that the second switch submits
             // first.
             StatefulRedisMultiDbConnectionImpl<StatefulRedisConnection<String, String>, String, String> connection = new StatefulRedisMultiDbConnectionImpl<StatefulRedisConnection<String, String>, String, String>(
                     null, databases, clientResources, codec, connectionFactory, healthStatusManager, null) {
 
                 @Override
-                protected void publishSwitchEvent(EventSequencer.Ticket ticket, SwitchReason reason, RedisURI fromUri,
+                protected void submitSwitchEvent(EventSequencer.Ticket ticket, SwitchReason reason, RedisURI fromUri,
                         RedisURI toUri) {
                     if (first.compareAndSet(true, false)) {
-                        firstPublishing.countDown();
+                        firstSubmitting.countDown();
                         try {
                             releaseFirst.await(2, TimeUnit.SECONDS);
                         } catch (InterruptedException e) {
                             Thread.currentThread().interrupt();
                         }
                     }
-                    super.publishSwitchEvent(ticket, reason, fromUri, toUri);
+                    super.submitSwitchEvent(ticket, reason, fromUri, toUri);
                 }
 
             };
@@ -1454,9 +1454,9 @@ class StatefulRedisMultiDbConnectionImplUnitTests {
 
                 Thread firstSwitch = new Thread(() -> connection.switchTo(uri2));
                 firstSwitch.start();
-                assertThat(firstPublishing.await(1, TimeUnit.SECONDS)).isTrue();
+                assertThat(firstSubmitting.await(1, TimeUnit.SECONDS)).isTrue();
 
-                connection.switchTo(uri1); // switches back and publishes while the first switch is paused
+                connection.switchTo(uri1); // switches back and submits while the first switch is paused
                 releaseFirst.countDown();
                 firstSwitch.join(TimeUnit.SECONDS.toMillis(2));
 

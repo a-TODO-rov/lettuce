@@ -836,7 +836,7 @@ class StatefulRedisMultiDbConnectionImpl<C extends StatefulRedisConnection<K, V>
         // Publish event outside the lock to avoid holding lock during event processing
         if (switchContext.eventTicket != null) {
             try (EventSequencer.Ticket ticket = switchContext.eventTicket) {
-                publishSwitchEvent(ticket, reason, switchContext.fromUri, switchContext.toUri);
+                submitSwitchEvent(ticket, reason, switchContext.fromUri, switchContext.toUri);
             }
         }
 
@@ -855,7 +855,7 @@ class StatefulRedisMultiDbConnectionImpl<C extends StatefulRedisConnection<K, V>
     }
 
     /**
-     * Publishes a {@link DatabaseSwitchEvent} at the place {@code ticket} reserved in the order of switches. This method is
+     * Submits a {@link DatabaseSwitchEvent} for the place {@code ticket} reserved in the order of switches. This method is
      * called outside the exclusive lock to avoid holding the lock during event processing.
      *
      * @param ticket the ticket reserved for this switch while the exclusive lock was held
@@ -863,8 +863,8 @@ class StatefulRedisMultiDbConnectionImpl<C extends StatefulRedisConnection<K, V>
      * @param fromUri the URI of the database being switched from
      * @param toUri the URI of the database being switched to
      */
-    protected void publishSwitchEvent(EventSequencer.Ticket ticket, SwitchReason reason, RedisURI fromUri, RedisURI toUri) {
-        ticket.publish(new DatabaseSwitchEvent(reason, new ImmutableRedisURI(fromUri), new ImmutableRedisURI(toUri), this));
+    protected void submitSwitchEvent(EventSequencer.Ticket ticket, SwitchReason reason, RedisURI fromUri, RedisURI toUri) {
+        ticket.submit(new DatabaseSwitchEvent(reason, new ImmutableRedisURI(fromUri), new ImmutableRedisURI(toUri), this));
     }
 
     /**
