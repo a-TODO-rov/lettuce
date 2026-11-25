@@ -102,6 +102,63 @@ Flux.create(sink -> {
 A thread of the computation thread pool (can be configured using [client
 resources](client-resources.md)) transports the events.
 
+### Event order
+
+Each subscriber receives the events published by one thread in the
+order that thread published them. Events published one after the other,
+where the second `publish` starts after the first one returned, reach
+every subscriber in that order. This covers the events of one
+connection's channel (connect, activate, redirections,
+re-authentication, deactivate, disconnect) and the steps of a reconnect.
+
+Events published at the same moment by different threads, for example
+redirections from different cluster nodes, may reach different
+subscribers in different orders.
+
+Database switch events of a multi-database connection reach every
+subscriber in the order the switches happened.
+
+### Publishing your own events in order (since 8.0)
+
+If you publish your own events from several threads and every
+subscriber must receive them in one order, publish them through an
+`EventSequencer`:
+
+- **reserve** a ticket where the order is decided, for example while
+  holding the lock that protects a state change,
+- **submit** the event for that ticket later, after releasing the lock,
+- or **cancel** the ticket if there is no event after all.
+
+``` java
+EventSequencer regionEvents = new EventSequencer(client.getResources().eventBus());
+
+EventSequencer.Ticket ticket;
+synchronized (lock) {
+    activeRegion = region;
+    ticket = regionEvents.reserve();
+}
+try (EventSequencer.Ticket t = ticket) {
+    t.submit(new RegionChangedEvent(region));
+}
+```
+
+Subscribers receive the sequencer's events in ticket order, whatever
+order they are submitted in. An event submitted before an earlier
+ticket's event is held back; the thread that submits or cancels the
+earlier ticket then releases both to the event bus, in order. Submitting
+never waits. Closing a ticket cancels it unless it was submitted, so
+try-with-resources never leaves a gap. Use `regionEvents.submit(event)`
+to reserve and submit in one step.
+
+The order covers the events of one sequencer only. To guard against a
+ticket that is never submitted or cancelled, create the sequencer with a
+timer and an expiry; an expired ticket no longer holds back later ones,
+and an event submitted for it afterwards is dropped:
+
+``` java
+new EventSequencer(eventBus, client.getResources().timer(), Duration.ofSeconds(5));
+```
+
 ### Connection events
 
 When working with events, multiple events occur. These can be used to

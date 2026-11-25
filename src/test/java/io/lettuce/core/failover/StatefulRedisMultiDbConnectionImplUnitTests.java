@@ -12,6 +12,8 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.TimeUnit;
 
 import io.lettuce.core.failover.health.HealthStatusListener;
@@ -41,6 +43,7 @@ import io.lettuce.core.failover.api.DatabaseConfig;
 import io.lettuce.core.failover.api.MultiDbOptions;
 import io.lettuce.core.event.Event;
 import io.lettuce.core.event.EventBus;
+import io.lettuce.core.event.EventSequencer;
 import io.lettuce.core.failover.event.AllDatabasesUnhealthyEvent;
 import io.lettuce.core.failover.event.DatabaseSwitchEvent;
 import io.lettuce.core.failover.event.SwitchReason;
@@ -1407,6 +1410,63 @@ class StatefulRedisMultiDbConnectionImplUnitTests {
 
             // Then: Weight should be set
             assertThat(db1.getWeight()).isEqualTo(0.001f);
+        }
+
+    }
+
+    @Nested
+    @Tag(UNIT_TEST)
+    @DisplayName("Switch Event Order Tests")
+    class SwitchEventOrderTests {
+
+        @Test
+        @DisplayName("Should publish switch events in switch order even if submitted in reverse")
+        void shouldPublishSwitchEventsInSwitchOrder() throws Exception {
+
+            CountDownLatch firstSubmitting = new CountDownLatch(1);
+            CountDownLatch releaseFirst = new CountDownLatch(1);
+            AtomicBoolean first = new AtomicBoolean(true);
+
+            // The first switch pauses after releasing the lock and before submitting, so that the second switch submits
+            // first.
+            StatefulRedisMultiDbConnectionImpl<StatefulRedisConnection<String, String>, String, String> connection = new StatefulRedisMultiDbConnectionImpl<StatefulRedisConnection<String, String>, String, String>(
+                    null, databases, clientResources, codec, connectionFactory, healthStatusManager, null) {
+
+                @Override
+                protected void submitSwitchEvent(EventSequencer.Ticket ticket, SwitchReason reason, RedisURI fromUri,
+                        RedisURI toUri) {
+                    if (first.compareAndSet(true, false)) {
+                        firstSubmitting.countDown();
+                        try {
+                            releaseFirst.await(2, TimeUnit.SECONDS);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                    }
+                    super.submitSwitchEvent(ticket, reason, fromUri, toUri);
+                }
+
+            };
+
+            try {
+                connection.switchTo(uri1);
+                reset(eventBus);
+
+                Thread firstSwitch = new Thread(() -> connection.switchTo(uri2));
+                firstSwitch.start();
+                assertThat(firstSubmitting.await(1, TimeUnit.SECONDS)).isTrue();
+
+                connection.switchTo(uri1); // switches back and submits while the first switch is paused
+                releaseFirst.countDown();
+                firstSwitch.join(TimeUnit.SECONDS.toMillis(2));
+
+                ArgumentCaptor<DatabaseSwitchEvent> events = ArgumentCaptor.forClass(DatabaseSwitchEvent.class);
+                verify(eventBus, times(2)).publish(events.capture());
+                assertThat(events.getAllValues()).extracting(DatabaseSwitchEvent::getToDb).containsExactly(uri2, uri1);
+            } finally {
+                releaseFirst.countDown();
+                connection.close();
+            }
         }
 
     }
